@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "netflix-deadline スパイク",
+  "version": "0.0.1",
+  "description": "マイリスト・スクレイピング検証用の使い捨てスパイク",
+  "permissions": ["activeTab", "scripting"],
+  "host_permissions": [
+    "https://www.netflix.com/*",
+    "https://www.primevideo.com/*",
+    "https://www.amazon.co.jp/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "マイリストをスクレイピング"
+  }
+}

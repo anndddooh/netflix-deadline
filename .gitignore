@@ -1,0 +1,18 @@
+# 依存
+node_modules/
+
+# ビルド成果物
+dist/
+.wrangler/
+
+# スパイクの生成物
+spike-justwatch/result.json
+
+# 環境変数・秘密情報
+.dev.vars
+.env
+.env.*
+
+# OS / エディタ
+.DS_Store
+*.log

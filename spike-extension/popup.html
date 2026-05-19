@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <style>
+      body {
+        width: 460px;
+        font-family: system-ui, sans-serif;
+        margin: 0;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 13px;
+        margin: 0 0 8px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 8px;
+      }
+      button {
+        padding: 6px 10px;
+        font-size: 12px;
+        cursor: pointer;
+      }
+      button:disabled {
+        cursor: default;
+        opacity: 0.5;
+      }
+      .summary {
+        font-size: 12px;
+        margin-bottom: 6px;
+        white-space: pre-wrap;
+      }
+      pre {
+        background: #f4f4f4;
+        border: 1px solid #ddd;
+        padding: 8px;
+        font-size: 11px;
+        max-height: 360px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-all;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>マイリスト・スクレイピング検証スパイク</h1>
+    <div class="row">
+      <button id="run">スクレイピング実行</button>
+      <button id="download" disabled>JSON ダウンロード</button>
+    </div>
+    <div id="summary" class="summary"></div>
+    <pre id="out">Netflix / Prime のマイリストページを開いて「スクレイピング実行」を押してください。</pre>
+    <script src="scraper.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>
