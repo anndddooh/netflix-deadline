@@ -3,6 +3,16 @@
   "name": "netflix-deadline-api",
   "main": "src/index.ts",
   "compatibility_date": "2026-05-01",
-  "compatibility_flags": ["nodejs_compat"]
-  // D1 / Cron Triggers などのバインディングは実装が進んだ段階で追加する。
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "netflix-deadline-db",
+      // リモートデプロイ前に `wrangler d1 create` で得た本物の ID に差し替える。
+      // ローカル開発（--local）ではこの値は使われない。
+      "database_id": "local-placeholder-replace-before-remote-deploy",
+      "migrations_dir": "drizzle"
+    }
+  ]
+  // Cron Triggers などのバインディングは実装が進んだ段階で追加する。
 }
