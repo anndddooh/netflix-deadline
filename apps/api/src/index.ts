@@ -1,15 +1,35 @@
 import { Hono } from 'hono';
-import { drizzle } from 'drizzle-orm/d1';
-import { and, eq, notInArray } from 'drizzle-orm';
+import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
+import { and, count, eq, notInArray } from 'drizzle-orm';
 import type {
   SyncWatchlistRequest,
   SyncWatchlistResponse,
 } from '@netflix-deadline/shared';
-import { users, watchlistItems } from './db/schema';
+import { users, watchlistItems, type User } from './db/schema';
+import { matchItem } from './matching';
 
 type Bindings = { DB: D1Database };
+type Db = DrizzleD1Database;
 
 const app = new Hono<{ Bindings: Bindings }>();
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Authorization: Bearer <extensionToken> からユーザーを解決する */
+async function authByToken(token: string, db: Db): Promise<User | null> {
+  if (!token) return null;
+  const user = await db
+    .select()
+    .from(users)
+    .where(eq(users.extensionToken, token))
+    .get();
+  return user ?? null;
+}
+
+function bearer(header: string | undefined): string {
+  const h = header ?? '';
+  return h.startsWith('Bearer ') ? h.slice(7) : '';
+}
 
 app.get('/health', (c) => c.json({ ok: true, service: 'netflix-deadline-api' }));
 
@@ -19,20 +39,10 @@ app.get('/health', (c) => c.json({ ok: true, service: 'netflix-deadline-api' }))
  * upsert したうえで、payload に無い既存作品（＝マイリストから外された作品）を削除する。
  */
 app.post('/api/watchlist/sync', async (c) => {
-  // 1. 拡張機能トークンで認証
-  const auth = c.req.header('Authorization') ?? '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
-  if (!token) return c.json({ error: 'missing token' }, 401);
-
   const db = drizzle(c.env.DB);
-  const user = await db
-    .select()
-    .from(users)
-    .where(eq(users.extensionToken, token))
-    .get();
-  if (!user) return c.json({ error: 'invalid token' }, 401);
+  const user = await authByToken(bearer(c.req.header('Authorization')), db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
 
-  // 2. ボディ検証
   const body = await c.req.json<SyncWatchlistRequest>().catch(() => null);
   if (
     !body ||
@@ -44,7 +54,7 @@ app.post('/api/watchlist/sync', async (c) => {
   const { service, items } = body;
   const now = Date.now();
 
-  // 3. 既存作品の externalId 集合（新規件数の判定用）
+  // 既存作品の externalId 集合（新規件数の判定用）
   const existing = await db
     .select({ externalId: watchlistItems.externalId })
     .from(watchlistItems)
@@ -54,7 +64,7 @@ app.post('/api/watchlist/sync', async (c) => {
     .all();
   const existingIds = new Set(existing.map((r) => r.externalId));
 
-  // 4. upsert
+  // upsert
   let added = 0;
   for (const item of items) {
     if (!existingIds.has(item.externalId)) added++;
@@ -84,7 +94,7 @@ app.post('/api/watchlist/sync', async (c) => {
       });
   }
 
-  // 5. マイリストから外された作品を削除
+  // マイリストから外された作品を削除
   const incomingIds = items.map((i) => i.externalId);
   const base = and(
     eq(watchlistItems.userId, user.id),
@@ -106,6 +116,80 @@ app.post('/api/watchlist/sync', async (c) => {
     removed: removedRows.length,
   };
   return c.json(res);
+});
+
+/**
+ * 未突き合わせ（matchStatus='pending'）の作品を JustWatch に問い合わせ、
+ * 配信終了日などを埋める。1リクエストあたり limit 件まで処理する
+ * （Worker のサブリクエスト上限を考慮）。残りは再呼び出し or cron で消化する。
+ */
+app.post('/api/watchlist/match', async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = await authByToken(bearer(c.req.header('Authorization')), db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+
+  const limitParam = Number(c.req.query('limit'));
+  const limit = Math.min(
+    Number.isFinite(limitParam) && limitParam > 0 ? limitParam : 25,
+    40
+  );
+
+  const pending = await db
+    .select()
+    .from(watchlistItems)
+    .where(
+      and(
+        eq(watchlistItems.userId, user.id),
+        eq(watchlistItems.matchStatus, 'pending')
+      )
+    )
+    .limit(limit)
+    .all();
+
+  let matched = 0;
+  let unmatched = 0;
+  let errors = 0;
+  const now = Date.now();
+
+  for (const item of pending) {
+    try {
+      const r = await matchItem({ service: item.service, title: item.title });
+      await db
+        .update(watchlistItems)
+        .set({
+          jwObjectId: r.jwObjectId,
+          jwTitle: r.jwTitle,
+          jwPath: r.jwPath,
+          expiresAt: r.expiresAt,
+          matchStatus: r.matchStatus,
+          expiryCheckedAt: now,
+        })
+        .where(eq(watchlistItems.id, item.id));
+      if (r.matchStatus === 'matched') matched++;
+      else unmatched++;
+    } catch {
+      errors++;
+    }
+    await sleep(150); // JustWatch への配慮
+  }
+
+  const [rest] = await db
+    .select({ n: count() })
+    .from(watchlistItems)
+    .where(
+      and(
+        eq(watchlistItems.userId, user.id),
+        eq(watchlistItems.matchStatus, 'pending')
+      )
+    );
+
+  return c.json({
+    processed: pending.length,
+    matched,
+    unmatched,
+    errors,
+    remaining: rest?.n ?? 0,
+  });
 });
 
 export default app;
