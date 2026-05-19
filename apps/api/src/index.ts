@@ -2,8 +2,10 @@ import { Hono } from 'hono';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { and, count, eq, notInArray } from 'drizzle-orm';
 import type {
+  GetWatchlistResponse,
   SyncWatchlistRequest,
   SyncWatchlistResponse,
+  WatchlistEntry,
 } from '@netflix-deadline/shared';
 import { users, watchlistItems, type User } from './db/schema';
 import { matchItem } from './matching';
@@ -32,6 +34,42 @@ function bearer(header: string | undefined): string {
 }
 
 app.get('/health', (c) => c.json({ ok: true, service: 'netflix-deadline-api' }));
+
+/**
+ * ユーザーのマイリストを返す。
+ * 配信終了日の早い順、終了日が無いものは末尾（タイトル順）。
+ */
+app.get('/api/watchlist', async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = await authByToken(bearer(c.req.header('Authorization')), db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+
+  const rows = await db
+    .select()
+    .from(watchlistItems)
+    .where(eq(watchlistItems.userId, user.id))
+    .all();
+
+  rows.sort((a, b) => {
+    if (a.expiresAt && b.expiresAt) return a.expiresAt.localeCompare(b.expiresAt);
+    if (a.expiresAt) return -1;
+    if (b.expiresAt) return 1;
+    return a.title.localeCompare(b.title, 'ja');
+  });
+
+  const items: WatchlistEntry[] = rows.map((r) => ({
+    id: r.id,
+    service: r.service,
+    externalId: r.externalId,
+    title: r.title,
+    entityType: r.entityType,
+    jwTitle: r.jwTitle,
+    expiresAt: r.expiresAt,
+    matchStatus: r.matchStatus,
+  }));
+
+  return c.json({ items } satisfies GetWatchlistResponse);
+});
 
 /**
  * 拡張機能からのマイリスト同期。
