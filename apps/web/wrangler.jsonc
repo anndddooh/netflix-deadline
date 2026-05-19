@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "netflix-deadline-web",
+  "compatibility_date": "2026-05-01",
+  // 静的 SPA を Workers Static Assets で配信する。
+  // ビルド成果物は ./dist、深いルートは index.html にフォールバック。
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}

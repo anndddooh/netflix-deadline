@@ -1,0 +1,8 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "netflix-deadline-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-01",
+  "compatibility_flags": ["nodejs_compat"]
+  // D1 / Cron Triggers などのバインディングは実装が進んだ段階で追加する。
+}
