@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "netflix-deadline 同期",
+  "version": "0.1.0",
+  "description": "Netflix / Prime のマイリストを netflix-deadline に同期する",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "https://www.netflix.com/*",
+    "https://www.primevideo.com/*",
+    "https://www.amazon.co.jp/*",
+    "http://localhost:8787/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "マイリストを同期"
+  }
+}
