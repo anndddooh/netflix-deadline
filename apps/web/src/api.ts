@@ -1,12 +1,29 @@
 import type { GetWatchlistResponse } from '@netflix-deadline/shared';
 
-// 開発用トークン。本番では Google ログインのセッションに置き換える。
-const DEV_TOKEN = 'dev-token-abc123';
+export interface UserInfo {
+  id: string;
+  email: string;
+  name: string | null;
+  extensionToken: string;
+  notifyEmail: string;
+  digestWeekday: number;
+  thresholdDays: number;
+}
+
+/** /auth/me を呼ぶ。未認証なら null。 */
+export async function fetchMe(): Promise<UserInfo | null> {
+  const res = await fetch('/auth/me');
+  if (res.status === 401) return null;
+  if (!res.ok) throw new Error(`/auth/me ${res.status}`);
+  return res.json();
+}
 
 export async function fetchWatchlist(): Promise<GetWatchlistResponse> {
-  const res = await fetch('/api/watchlist', {
-    headers: { Authorization: `Bearer ${DEV_TOKEN}` },
-  });
-  if (!res.ok) throw new Error(`API ${res.status}`);
+  const res = await fetch('/api/watchlist');
+  if (!res.ok) throw new Error(`/api/watchlist ${res.status}`);
   return res.json();
+}
+
+export async function logout(): Promise<void> {
+  await fetch('/auth/logout', { method: 'POST' });
 }

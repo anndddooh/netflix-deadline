@@ -1,4 +1,4 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { and, count, eq, inArray } from 'drizzle-orm';
 import type {
@@ -12,35 +12,215 @@ import { matchItem } from './matching';
 import { refreshStalest } from './refresh';
 import { buildDigestForUser, runWeeklyDigests } from './digest';
 import { senderFromEnv } from './email';
+import { randomString, readCookie, signSession, verifySession } from './auth';
+import {
+  exchangeCode,
+  fetchUserInfo,
+  googleAuthUrl,
+  type GoogleUserInfo,
+  type OAuthConfig,
+} from './oauth';
 
 type Bindings = {
   DB: D1Database;
   RESEND_API_KEY?: string;
   EMAIL_FROM?: string;
+  // OAuth (Google)
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  OAUTH_REDIRECT_URI?: string;
+  // セッション署名鍵
+  SESSION_SECRET?: string;
+  // ログイン後のリダイレクト先（Web アプリ）
+  WEB_BASE?: string;
 };
 type Db = DrizzleD1Database;
+type Ctx = Context<{ Bindings: Bindings }>;
 
 const app = new Hono<{ Bindings: Bindings }>();
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Authorization: Bearer <extensionToken> からユーザーを解決する */
-async function authByToken(token: string, db: Db): Promise<User | null> {
-  if (!token) return null;
-  const user = await db
-    .select()
-    .from(users)
-    .where(eq(users.extensionToken, token))
-    .get();
-  return user ?? null;
-}
+const SESSION_COOKIE = 'nd_session';
+const OAUTH_STATE_COOKIE = 'nd_oauth_state';
+const SESSION_TTL_MS = 30 * 86_400_000; // 30 日
 
 function bearer(header: string | undefined): string {
   const h = header ?? '';
   return h.startsWith('Bearer ') ? h.slice(7) : '';
 }
 
+/**
+ * リクエストを認証してユーザーを返す。
+ * 優先順位: Authorization Bearer（拡張機能トークン）→ nd_session クッキー。
+ */
+async function authenticate(c: Ctx, db: Db): Promise<User | null> {
+  // 1) 拡張機能のペアリングトークン
+  const token = bearer(c.req.header('Authorization'));
+  if (token) {
+    const u = await db
+      .select()
+      .from(users)
+      .where(eq(users.extensionToken, token))
+      .get();
+    if (u) return u;
+  }
+  // 2) Web のセッションクッキー
+  const secret = c.env.SESSION_SECRET;
+  if (secret) {
+    const cookieVal = readCookie(c.req.header('Cookie'), SESSION_COOKIE);
+    if (cookieVal) {
+      const session = await verifySession(cookieVal, secret);
+      if (session) {
+        const u = await db
+          .select()
+          .from(users)
+          .where(eq(users.id, session.userId))
+          .get();
+        if (u) return u;
+      }
+    }
+  }
+  return null;
+}
+
+/** Google のユーザー情報から、既存ユーザーを引くか新規作成する */
+async function findOrCreateUser(
+  db: Db,
+  info: GoogleUserInfo
+): Promise<User> {
+  // 1) googleSub で一致
+  let existing = await db
+    .select()
+    .from(users)
+    .where(eq(users.googleSub, info.sub))
+    .get();
+  if (existing) return existing;
+
+  // 2) email で一致（dev ユーザー等を Google アカウントに紐付けるパス）
+  existing = await db.select().from(users).where(eq(users.email, info.email)).get();
+  if (existing) {
+    await db
+      .update(users)
+      .set({ googleSub: info.sub, name: info.name ?? existing.name })
+      .where(eq(users.id, existing.id));
+    return { ...existing, googleSub: info.sub, name: info.name ?? existing.name };
+  }
+
+  // 3) 新規作成
+  const created: User = {
+    id: crypto.randomUUID(),
+    googleSub: info.sub,
+    email: info.email,
+    name: info.name ?? null,
+    extensionToken: crypto.randomUUID(),
+    notifyEmail: info.email,
+    digestWeekday: 1,
+    thresholdDays: 14,
+    createdAt: Date.now(),
+  };
+  await db.insert(users).values(created);
+  return created;
+}
+
+function oauthConfig(env: Bindings): OAuthConfig | null {
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.OAUTH_REDIRECT_URI) {
+    return null;
+  }
+  return {
+    clientId: env.GOOGLE_CLIENT_ID,
+    clientSecret: env.GOOGLE_CLIENT_SECRET,
+    redirectUri: env.OAUTH_REDIRECT_URI,
+  };
+}
+
 app.get('/health', (c) => c.json({ ok: true, service: 'netflix-deadline-api' }));
+
+// ====================== 認証 ======================
+
+/** Google ログイン開始。state を cookie に保存して認可エンドポイントへリダイレクト。 */
+app.get('/auth/google/start', (c) => {
+  const cfg = oauthConfig(c.env);
+  if (!cfg) return c.json({ error: 'OAuth が未設定' }, 500);
+  const state = randomString(24);
+  c.header(
+    'Set-Cookie',
+    `${OAUTH_STATE_COOKIE}=${state}; Path=/; HttpOnly; SameSite=Lax; Max-Age=600`
+  );
+  return c.redirect(googleAuthUrl(cfg, state));
+});
+
+/** Google からのコールバック。code→token→userinfo→ユーザー解決→セッションクッキー発行。 */
+app.get('/auth/google/callback', async (c) => {
+  const cfg = oauthConfig(c.env);
+  const secret = c.env.SESSION_SECRET;
+  const webBase = c.env.WEB_BASE ?? '/';
+  if (!cfg || !secret) return c.json({ error: 'OAuth/session が未設定' }, 500);
+
+  const code = c.req.query('code');
+  const state = c.req.query('state');
+  const stateCookie = readCookie(c.req.header('Cookie'), OAUTH_STATE_COOKIE);
+  if (!code || !state || !stateCookie || state !== stateCookie) {
+    return c.json({ error: 'invalid state' }, 400);
+  }
+
+  let info: GoogleUserInfo;
+  try {
+    const tok = await exchangeCode(cfg, code);
+    info = await fetchUserInfo(tok.access_token);
+  } catch (e) {
+    return c.json(
+      { error: 'oauth_failed', detail: e instanceof Error ? e.message : String(e) },
+      502
+    );
+  }
+  if (!info.email) return c.json({ error: 'email scope not granted' }, 400);
+
+  const db = drizzle(c.env.DB);
+  const user = await findOrCreateUser(db, info);
+  const token = await signSession(
+    { userId: user.id, exp: Date.now() + SESSION_TTL_MS },
+    secret
+  );
+
+  c.header(
+    'Set-Cookie',
+    `${SESSION_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`
+  );
+  c.header(
+    'Set-Cookie',
+    `${OAUTH_STATE_COOKIE}=; Path=/; Max-Age=0`,
+    { append: true }
+  );
+  return c.redirect(webBase);
+});
+
+/** ログイン中のユーザー情報を返す（Web アプリの起動時チェックや設定画面で使用） */
+app.get('/auth/me', async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = await authenticate(c, db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+  return c.json({
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    extensionToken: user.extensionToken,
+    notifyEmail: user.notifyEmail,
+    digestWeekday: user.digestWeekday,
+    thresholdDays: user.thresholdDays,
+  });
+});
+
+/** ログアウト（セッションクッキーを失効させる） */
+app.post('/auth/logout', (c) => {
+  c.header(
+    'Set-Cookie',
+    `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
+  );
+  return c.json({ ok: true });
+});
+
+// ====================== マイリスト ======================
 
 /**
  * ユーザーのマイリストを返す。
@@ -48,7 +228,7 @@ app.get('/health', (c) => c.json({ ok: true, service: 'netflix-deadline-api' }))
  */
 app.get('/api/watchlist', async (c) => {
   const db = drizzle(c.env.DB);
-  const user = await authByToken(bearer(c.req.header('Authorization')), db);
+  const user = await authenticate(c, db);
   if (!user) return c.json({ error: 'unauthorized' }, 401);
 
   const rows = await db
@@ -85,7 +265,7 @@ app.get('/api/watchlist', async (c) => {
  */
 app.post('/api/watchlist/sync', async (c) => {
   const db = drizzle(c.env.DB);
-  const user = await authByToken(bearer(c.req.header('Authorization')), db);
+  const user = await authenticate(c, db);
   if (!user) return c.json({ error: 'unauthorized' }, 401);
 
   const body = await c.req.json<SyncWatchlistRequest>().catch(() => null);
@@ -180,7 +360,7 @@ app.post('/api/watchlist/sync', async (c) => {
  */
 app.post('/api/watchlist/match', async (c) => {
   const db = drizzle(c.env.DB);
-  const user = await authByToken(bearer(c.req.header('Authorization')), db);
+  const user = await authenticate(c, db);
   if (!user) return c.json({ error: 'unauthorized' }, 401);
 
   const limitParam = Number(c.req.query('limit'));
@@ -252,7 +432,7 @@ app.post('/api/watchlist/match', async (c) => {
  */
 app.get('/api/digest/preview', async (c) => {
   const db = drizzle(c.env.DB);
-  const user = await authByToken(bearer(c.req.header('Authorization')), db);
+  const user = await authenticate(c, db);
   if (!user) return c.json({ error: 'unauthorized' }, 401);
   const msg = await buildDigestForUser(db, user, new Date());
   if (!msg) return c.json({ message: '配信終了予定の作品が無いため空' });
@@ -264,7 +444,7 @@ app.get('/api/digest/preview', async (c) => {
  */
 app.post('/api/digest/run', async (c) => {
   const db = drizzle(c.env.DB);
-  const user = await authByToken(bearer(c.req.header('Authorization')), db);
+  const user = await authenticate(c, db);
   if (!user) return c.json({ error: 'unauthorized' }, 401);
   const msg = await buildDigestForUser(db, user, new Date());
   if (!msg) return c.json({ sent: false, reason: '配信終了予定の作品が無い' });
