@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
-import { and, count, eq, notInArray } from 'drizzle-orm';
+import { and, count, eq, inArray } from 'drizzle-orm';
 import type {
   GetWatchlistResponse,
   SyncWatchlistRequest,
@@ -9,6 +9,7 @@ import type {
 } from '@netflix-deadline/shared';
 import { users, watchlistItems, type User } from './db/schema';
 import { matchItem } from './matching';
+import { refreshStalest } from './refresh';
 
 type Bindings = { DB: D1Database };
 type Db = DrizzleD1Database;
@@ -132,26 +133,36 @@ app.post('/api/watchlist/sync', async (c) => {
       });
   }
 
-  // マイリストから外された作品を削除
-  const incomingIds = items.map((i) => i.externalId);
-  const base = and(
-    eq(watchlistItems.userId, user.id),
-    eq(watchlistItems.service, service)
-  );
-  const removedRows = await db
-    .delete(watchlistItems)
-    .where(
-      incomingIds.length > 0
-        ? and(base, notInArray(watchlistItems.externalId, incomingIds))
-        : base
-    )
-    .returning({ id: watchlistItems.id });
+  // マイリストから外された作品を削除。
+  // D1 は1ステートメントあたりバインド変数100個までなので NOT IN は使えない。
+  // 差分を JS で計算し、80件ずつ IN で削除する。
+  const incomingSet = new Set(items.map((i) => i.externalId));
+  const toDelete = existing
+    .map((r) => r.externalId)
+    .filter((id) => !incomingSet.has(id));
+
+  let removed = 0;
+  const CHUNK = 80;
+  for (let i = 0; i < toDelete.length; i += CHUNK) {
+    const chunk = toDelete.slice(i, i + CHUNK);
+    const rows = await db
+      .delete(watchlistItems)
+      .where(
+        and(
+          eq(watchlistItems.userId, user.id),
+          eq(watchlistItems.service, service),
+          inArray(watchlistItems.externalId, chunk)
+        )
+      )
+      .returning({ id: watchlistItems.id });
+    removed += rows.length;
+  }
 
   const res: SyncWatchlistResponse = {
     service,
     received: items.length,
     added,
-    removed: removedRows.length,
+    removed,
   };
   return c.json(res);
 });
@@ -230,4 +241,30 @@ app.post('/api/watchlist/match', async (c) => {
   });
 });
 
-export default app;
+/**
+ * Cron Triggers から呼ばれる定期実行ハンドラ。
+ * wrangler.jsonc の triggers.crons で「毎時0分」に設定。
+ * 1回あたり最大 25 件の作品を JustWatch に再問い合わせし、
+ * 配信終了日を最新化する（267 件規模でも約 11 時間で一周）。
+ */
+const scheduled: ExportedHandlerScheduledHandler<Bindings> = async (
+  _event,
+  env,
+  ctx
+) => {
+  const db = drizzle(env.DB);
+  ctx.waitUntil(
+    refreshStalest(db, 25)
+      .then((s) =>
+        console.log(
+          `[cron] processed=${s.processed} matched=${s.matched} unmatched=${s.unmatched} errors=${s.errors}`
+        )
+      )
+      .catch((e: unknown) => console.error('[cron] refresh failed:', e))
+  );
+};
+
+export default {
+  fetch: app.fetch,
+  scheduled,
+} satisfies ExportedHandler<Bindings>;
