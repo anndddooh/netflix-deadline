@@ -1,0 +1,11 @@
+# apps/api/.dev.vars にコピーして実値を入れる（.dev.vars は gitignore 済み）。
+# wrangler dev が起動時に読み込み、env.* として参照可能になる。
+
+# Resend の API キー。https://resend.com/ でサインアップして
+# ダッシュボード → API Keys → Create API Key（Sending access）で取得。
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# 送信元メールアドレス。
+# ドメイン認証前は onboarding@resend.dev を使い、宛先は Resend にサインアップした
+# アドレスに限定される。独自ドメインを認証したら from を差し替える。
+EMAIL_FROM=onboarding@resend.dev
