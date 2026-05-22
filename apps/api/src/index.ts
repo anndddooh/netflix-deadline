@@ -10,8 +10,14 @@ import type {
 import { users, watchlistItems, type User } from './db/schema';
 import { matchItem } from './matching';
 import { refreshStalest } from './refresh';
+import { buildDigestForUser, runWeeklyDigests } from './digest';
+import { senderFromEnv } from './email';
 
-type Bindings = { DB: D1Database };
+type Bindings = {
+  DB: D1Database;
+  RESEND_API_KEY?: string;
+  EMAIL_FROM?: string;
+};
 type Db = DrizzleD1Database;
 
 const app = new Hono<{ Bindings: Bindings }>();
@@ -242,26 +248,71 @@ app.post('/api/watchlist/match', async (c) => {
 });
 
 /**
+ * ダイジェスト本文を返す（送信しない）。動作確認用。
+ */
+app.get('/api/digest/preview', async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = await authByToken(bearer(c.req.header('Authorization')), db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+  const msg = await buildDigestForUser(db, user, new Date());
+  if (!msg) return c.json({ message: '配信終了予定の作品が無いため空' });
+  return c.json(msg);
+});
+
+/**
+ * 即時にダイジェストを生成・送信する（曜日は無視）。動作確認用。
+ */
+app.post('/api/digest/run', async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = await authByToken(bearer(c.req.header('Authorization')), db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+  const msg = await buildDigestForUser(db, user, new Date());
+  if (!msg) return c.json({ sent: false, reason: '配信終了予定の作品が無い' });
+  const sender = senderFromEnv(c.env);
+  try {
+    await sender.send(msg);
+    return c.json({ sent: true, to: msg.to, subject: msg.subject });
+  } catch (e) {
+    return c.json(
+      { sent: false, error: e instanceof Error ? e.message : String(e) },
+      500
+    );
+  }
+});
+
+/**
  * Cron Triggers から呼ばれる定期実行ハンドラ。
- * wrangler.jsonc の triggers.crons で「毎時0分」に設定。
- * 1回あたり最大 25 件の作品を JustWatch に再問い合わせし、
- * 配信終了日を最新化する（267 件規模でも約 11 時間で一周）。
+ * - "0 * * * *"     : 毎時0分 JustWatch リフレッシュ（25件ずつ）
+ * - "0 23 * * *"    : 毎日 23:00 UTC = 08:00 JST 翌日、週次ダイジェスト判定・送信
  */
 const scheduled: ExportedHandlerScheduledHandler<Bindings> = async (
-  _event,
+  event,
   env,
   ctx
 ) => {
   const db = drizzle(env.DB);
-  ctx.waitUntil(
-    refreshStalest(db, 25)
-      .then((s) =>
-        console.log(
-          `[cron] processed=${s.processed} matched=${s.matched} unmatched=${s.unmatched} errors=${s.errors}`
+  if (event.cron === '0 * * * *') {
+    ctx.waitUntil(
+      refreshStalest(db, 25)
+        .then((s) =>
+          console.log(
+            `[cron refresh] processed=${s.processed} matched=${s.matched} unmatched=${s.unmatched} errors=${s.errors}`
+          )
         )
-      )
-      .catch((e: unknown) => console.error('[cron] refresh failed:', e))
-  );
+        .catch((e: unknown) => console.error('[cron refresh] failed:', e))
+    );
+  } else if (event.cron === '0 23 * * *') {
+    const sender = senderFromEnv(env);
+    ctx.waitUntil(
+      runWeeklyDigests(db, sender, new Date())
+        .then((s) =>
+          console.log(
+            `[cron digest] users=${s.usersChecked} sent=${s.sent} skipped=${s.skipped} errors=${s.errors}`
+          )
+        )
+        .catch((e: unknown) => console.error('[cron digest] failed:', e))
+    );
+  }
 };
 
 export default {
