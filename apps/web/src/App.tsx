@@ -15,6 +15,19 @@ export function App() {
   const [items, setItems] = useState<WatchlistEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('list');
+  const [showExtPanel, setShowExtPanel] = useState(false);
+  const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
+
+  const copy = async (label: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedLabel(label);
+      setTimeout(() => setCopiedLabel(null), 2000);
+    } catch {
+      // クリップボード API 不可の環境向けフォールバック
+      window.prompt(`${label} をコピーしてください`, value);
+    }
+  };
 
   // 起動時に認証状態を確認
   useEffect(() => {
@@ -61,6 +74,9 @@ export function App() {
         <h1>netflix-deadline</h1>
         <div className="user-info">
           <span className="muted">{auth.user.email}</span>
+          <button onClick={() => setShowExtPanel((v) => !v)}>
+            {showExtPanel ? '拡張機能設定を閉じる' : '拡張機能設定'}
+          </button>
           <button
             onClick={async () => {
               await logout();
@@ -86,6 +102,34 @@ export function App() {
           </button>
         </nav>
       </header>
+
+      {showExtPanel && (
+        <section className="ext-panel">
+          <h2>拡張機能設定</h2>
+          <p className="muted">
+            Chrome 拡張機能のポップアップに、下の2つの値を貼り付けてください。
+          </p>
+          <div className="ext-row">
+            <label>API URL</label>
+            <code>{window.location.origin}</code>
+            <button onClick={() => copy('API URL', window.location.origin)}>
+              コピー
+            </button>
+          </div>
+          <div className="ext-row">
+            <label>ペアリングトークン</label>
+            <code>{auth.user.extensionToken}</code>
+            <button
+              onClick={() => copy('ペアリングトークン', auth.user.extensionToken)}
+            >
+              コピー
+            </button>
+          </div>
+          {copiedLabel && (
+            <p className="copied">「{copiedLabel}」をコピーしました</p>
+          )}
+        </section>
+      )}
 
       {error && <p className="error">読み込みエラー: {error}</p>}
       {!items && !error && <p className="muted">読み込み中…</p>}

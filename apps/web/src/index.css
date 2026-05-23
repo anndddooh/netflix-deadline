@@ -99,6 +99,62 @@ h2 {
   background: #333;
 }
 
+/* 拡張機能設定パネル */
+.ext-panel {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.ext-panel h2 {
+  margin: 0 0 6px;
+  color: #1a1a1a;
+}
+
+.ext-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+
+.ext-row label {
+  font-size: 12px;
+  color: #555;
+  min-width: 130px;
+}
+
+.ext-row code {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  background: #f4f4f4;
+  padding: 4px 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ext-row button {
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  background: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.copied {
+  color: #2a7a2a;
+  font-size: 12px;
+  margin: 4px 0 0;
+}
+
 /* 一覧 */
 .entries {
   list-style: none;
