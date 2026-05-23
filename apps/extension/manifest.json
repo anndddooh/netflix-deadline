@@ -8,7 +8,8 @@
     "https://www.netflix.com/*",
     "https://www.primevideo.com/*",
     "https://www.amazon.co.jp/*",
-    "http://localhost:8787/*"
+    "http://localhost:8787/*",
+    "https://*.workers.dev/*"
   ],
   "action": {
     "default_popup": "popup.html",

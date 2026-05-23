@@ -84,30 +84,21 @@ async function authenticate(c: Ctx, db: Db): Promise<User | null> {
   return null;
 }
 
-/** Google のユーザー情報から、既存ユーザーを引くか新規作成する */
+/**
+ * Google のユーザー情報から、既存ユーザーを引くか新規作成する。
+ * googleSub のみで照合する（email は一致しても他人の可能性があるため使わない）。
+ */
 async function findOrCreateUser(
   db: Db,
   info: GoogleUserInfo
 ): Promise<User> {
-  // 1) googleSub で一致
-  let existing = await db
+  const existing = await db
     .select()
     .from(users)
     .where(eq(users.googleSub, info.sub))
     .get();
   if (existing) return existing;
 
-  // 2) email で一致（dev ユーザー等を Google アカウントに紐付けるパス）
-  existing = await db.select().from(users).where(eq(users.email, info.email)).get();
-  if (existing) {
-    await db
-      .update(users)
-      .set({ googleSub: info.sub, name: info.name ?? existing.name })
-      .where(eq(users.id, existing.id));
-    return { ...existing, googleSub: info.sub, name: info.name ?? existing.name };
-  }
-
-  // 3) 新規作成
   const created: User = {
     id: crypto.randomUUID(),
     googleSub: info.sub,

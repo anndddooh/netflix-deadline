@@ -4,6 +4,7 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-05-01",
   "compatibility_flags": ["nodejs_compat"],
+
   "d1_databases": [
     {
       "binding": "DB",
@@ -14,6 +15,26 @@
       "migrations_dir": "drizzle"
     }
   ],
+
+  // 同じ Worker が API（/api/* と /auth/*）と静的SPA（apps/web の dist）を配信する。
+  // run_worker_first で /api と /auth を Worker に流し、それ以外を静的アセットへ。
+  // not_found_handling=single-page-application で SPA の深いルートも index.html に
+  // フォールバックさせる。
+  "assets": {
+    "directory": "../web/dist",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/auth/*"]
+  },
+
+  // 非機密の環境変数。
+  // 機密値（GOOGLE_CLIENT_SECRET / RESEND_API_KEY / SESSION_SECRET）は
+  // `wrangler secret put` で別途設定する。
+  // OAUTH_REDIRECT_URI / WEB_BASE は初回デプロイで URL が判明したら追記する。
+  "vars": {
+    "EMAIL_FROM": "onboarding@resend.dev",
+    "GOOGLE_CLIENT_ID": "209442782190-8h8celjv7np71i60vsutcbe58kh3aon7.apps.googleusercontent.com"
+  },
+
   // cron スケジュール:
   //  - 毎時0分: JustWatch リフレッシュ（1回25件、267件規模なら約11時間で一周）
   //  - 毎日 23:00 UTC (= 08:00 JST 翌日): 週次ダイジェストの送信判定

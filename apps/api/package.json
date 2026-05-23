@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --test-scheduled --port 8787",
-    "deploy": "wrangler deploy",
+    "deploy": "npm run build -w @netflix-deadline/web && wrangler deploy",
     "typecheck": "tsc -p tsconfig.json",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply netflix-deadline-db --local",
