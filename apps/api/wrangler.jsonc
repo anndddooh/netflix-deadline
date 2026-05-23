@@ -9,9 +9,7 @@
     {
       "binding": "DB",
       "database_name": "netflix-deadline-db",
-      // リモートデプロイ前に `wrangler d1 create` で得た本物の ID に差し替える。
-      // ローカル開発（--local）ではこの値は使われない。
-      "database_id": "local-placeholder-replace-before-remote-deploy",
+      "database_id": "c77917df-fe90-4a22-97fe-6f2a6befb469",
       "migrations_dir": "drizzle"
     }
   ],
@@ -32,7 +30,9 @@
   // OAUTH_REDIRECT_URI / WEB_BASE は初回デプロイで URL が判明したら追記する。
   "vars": {
     "EMAIL_FROM": "onboarding@resend.dev",
-    "GOOGLE_CLIENT_ID": "209442782190-8h8celjv7np71i60vsutcbe58kh3aon7.apps.googleusercontent.com"
+    "GOOGLE_CLIENT_ID": "209442782190-8h8celjv7np71i60vsutcbe58kh3aon7.apps.googleusercontent.com",
+    "OAUTH_REDIRECT_URI": "https://netflix-deadline-api.annndddddooooooo.workers.dev/auth/google/callback",
+    "WEB_BASE": "https://netflix-deadline-api.annndddddooooooo.workers.dev/"
   },
 
   // cron スケジュール:
