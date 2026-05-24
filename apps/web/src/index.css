@@ -399,6 +399,66 @@ a {
 }
 
 /* =========================================================
+ * マイリスト外部リンクバー
+ * ========================================================= */
+
+.mylist-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.mylist-bar-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mylist-bar-hint {
+  font-size: 12px;
+  margin-left: auto;
+}
+
+.mylist-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: var(--text);
+  font-size: 13px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.mylist-link:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-subtle);
+}
+
+.ext-arrow {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  .mylist-bar-hint {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+}
+
+/* =========================================================
  * サマリーカード
  * ========================================================= */
 

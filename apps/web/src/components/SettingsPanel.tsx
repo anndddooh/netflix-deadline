@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { updateSettings, type UserInfo } from '../api';
+import { MYLIST_URLS } from '../lib/services';
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -105,6 +106,36 @@ export function SettingsPanel({ user, onUpdate }: Props) {
               {message.text}
             </span>
           )}
+        </div>
+      </section>
+
+      <section className="card">
+        <h2 className="card-title">マイリストを開く</h2>
+        <p className="card-desc">
+          Netflix / Prime の自分のマイリストページを直接開けます。編集後、
+          拡張機能の「同期」を押すとこのアプリに反映されます。
+        </p>
+        <div className="mylist-bar" style={{ margin: 0, border: 'none', padding: 0, boxShadow: 'none' }}>
+          <a
+            className="mylist-link netflix"
+            href={MYLIST_URLS.netflix}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="badge netflix">Netflix</span>
+            <span>マイリストを開く</span>
+            <span className="ext-arrow">↗</span>
+          </a>
+          <a
+            className="mylist-link prime"
+            href={MYLIST_URLS.prime}
+            target="_blank"
+            rel="noreferrer"
+          >
+            <span className="badge prime">Prime</span>
+            <span>ウォッチリストを開く</span>
+            <span className="ext-arrow">↗</span>
+          </a>
         </div>
       </section>
 

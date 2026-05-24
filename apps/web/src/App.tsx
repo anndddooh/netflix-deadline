@@ -6,6 +6,7 @@ import { WatchlistCalendar } from './components/WatchlistCalendar';
 import { SettingsPanel } from './components/SettingsPanel';
 import { MatchReview } from './components/MatchReview';
 import { daysUntil } from './lib/date';
+import { MYLIST_URLS } from './lib/services';
 
 type Tab = 'list' | 'calendar' | 'review' | 'settings';
 type AuthState =
@@ -141,6 +142,35 @@ export function App() {
       </header>
 
       <main className="app">
+        {(tab === 'list' || tab === 'calendar') && (
+          <div className="mylist-bar">
+            <span className="mylist-bar-label">マイリストを編集</span>
+            <a
+              className="mylist-link netflix"
+              href={MYLIST_URLS.netflix}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span className="badge netflix">Netflix</span>
+              <span>マイリストを開く</span>
+              <span className="ext-arrow">↗</span>
+            </a>
+            <a
+              className="mylist-link prime"
+              href={MYLIST_URLS.prime}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span className="badge prime">Prime</span>
+              <span>ウォッチリストを開く</span>
+              <span className="ext-arrow">↗</span>
+            </a>
+            <span className="mylist-bar-hint muted">
+              編集後、拡張機能の「同期」を押すと反映されます
+            </span>
+          </div>
+        )}
+
         {summary && (tab === 'list' || tab === 'calendar') && (
           <div className="summary">
             <StatCard label="登録作品" value={summary.total} />
