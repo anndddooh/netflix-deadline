@@ -13,14 +13,22 @@ function urgency(days: number): string {
   return '';
 }
 
+function daysLabel(d: number): string {
+  if (d < 0) return '終了済み';
+  if (d === 0) return '本日終了';
+  return `あと ${d} 日`;
+}
+
 export function WatchlistList({ items }: { items: WatchlistEntry[] }) {
   const withExpiry = items.filter((i) => i.expiresAt);
   const noExpiry = items.filter((i) => !i.expiresAt);
 
   return (
     <div>
-      <section>
-        <h2>配信終了予定あり（{withExpiry.length}）</h2>
+      <section className="list-section">
+        <h2 className="list-section-title">
+          配信終了予定あり（{withExpiry.length}）
+        </h2>
         {withExpiry.length === 0 && <p className="muted">該当なし</p>}
         <ul className="entries">
           {withExpiry.map((i) => {
@@ -31,9 +39,7 @@ export function WatchlistList({ items }: { items: WatchlistEntry[] }) {
                   {SERVICE_LABEL[i.service]}
                 </span>
                 <span className="title">{i.title}</span>
-                <span className="days">
-                  {d < 0 ? '終了済み' : d === 0 ? '本日終了' : `あと ${d} 日`}
-                </span>
+                <span className="days">{daysLabel(d)}</span>
                 <span className="date">{i.expiresAt}</span>
               </li>
             );
@@ -41,8 +47,10 @@ export function WatchlistList({ items }: { items: WatchlistEntry[] }) {
         </ul>
       </section>
 
-      <section>
-        <h2>配信終了予定なし（{noExpiry.length}）</h2>
+      <section className="list-section">
+        <h2 className="list-section-title">
+          配信終了予定なし（{noExpiry.length}）
+        </h2>
         <ul className="entries">
           {noExpiry.map((i) => (
             <li key={i.id} className="entry">
@@ -51,7 +59,10 @@ export function WatchlistList({ items }: { items: WatchlistEntry[] }) {
               </span>
               <span className="title">{i.title}</span>
               {i.matchStatus === 'unmatched' && (
-                <span className="muted">未マッチ</span>
+                <span className="entry-meta">未マッチ</span>
+              )}
+              {i.matchStatus === 'pending' && (
+                <span className="entry-meta">マッチ保留中</span>
               )}
             </li>
           ))}

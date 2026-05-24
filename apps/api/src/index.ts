@@ -2,13 +2,23 @@ import { Hono, type Context } from 'hono';
 import { drizzle, type DrizzleD1Database } from 'drizzle-orm/d1';
 import { and, count, eq, inArray } from 'drizzle-orm';
 import type {
+  CandidatesResponse,
+  ConfirmMatchRequest,
   GetWatchlistResponse,
+  MatchCandidate,
   SyncWatchlistRequest,
   SyncWatchlistResponse,
+  UpdateSettingsRequest,
   WatchlistEntry,
 } from '@netflix-deadline/shared';
 import { users, watchlistItems, type User } from './db/schema';
-import { matchItem } from './matching';
+import {
+  buildSearchQuery,
+  extractExpiry,
+  matchItem,
+  nodeToResult,
+} from './matching';
+import { searchTitles } from './justwatch';
 import { refreshStalest } from './refresh';
 import { buildDigestForUser, runWeeklyDigests } from './digest';
 import { senderFromEnv } from './email';
@@ -199,6 +209,58 @@ app.get('/auth/me', async (c) => {
     notifyEmail: user.notifyEmail,
     digestWeekday: user.digestWeekday,
     thresholdDays: user.thresholdDays,
+  });
+});
+
+/**
+ * 通知設定の更新。送信曜日（0..6）・閾値日数（1..365）・通知先メールを差分更新する。
+ * 拡張機能のペアリングトークンでも更新可（拡張からは notifyEmail 等は触らない想定だが許容）。
+ */
+app.patch('/auth/me', async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = await authenticate(c, db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+
+  const body = await c.req.json<UpdateSettingsRequest>().catch(() => null);
+  if (!body || typeof body !== 'object') {
+    return c.json({ error: 'invalid body' }, 400);
+  }
+
+  const patch: Partial<Pick<User, 'notifyEmail' | 'digestWeekday' | 'thresholdDays'>> = {};
+
+  if (body.notifyEmail !== undefined) {
+    if (typeof body.notifyEmail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.notifyEmail)) {
+      return c.json({ error: 'invalid notifyEmail' }, 400);
+    }
+    patch.notifyEmail = body.notifyEmail;
+  }
+  if (body.digestWeekday !== undefined) {
+    if (!Number.isInteger(body.digestWeekday) || body.digestWeekday < 0 || body.digestWeekday > 6) {
+      return c.json({ error: 'digestWeekday must be 0..6' }, 400);
+    }
+    patch.digestWeekday = body.digestWeekday;
+  }
+  if (body.thresholdDays !== undefined) {
+    if (!Number.isInteger(body.thresholdDays) || body.thresholdDays < 1 || body.thresholdDays > 365) {
+      return c.json({ error: 'thresholdDays must be 1..365' }, 400);
+    }
+    patch.thresholdDays = body.thresholdDays;
+  }
+
+  if (Object.keys(patch).length === 0) {
+    return c.json({ error: 'no fields to update' }, 400);
+  }
+
+  await db.update(users).set(patch).where(eq(users.id, user.id));
+  const updated = { ...user, ...patch };
+  return c.json({
+    id: updated.id,
+    email: updated.email,
+    name: updated.name,
+    extensionToken: updated.extensionToken,
+    notifyEmail: updated.notifyEmail,
+    digestWeekday: updated.digestWeekday,
+    thresholdDays: updated.thresholdDays,
   });
 });
 
@@ -416,6 +478,121 @@ app.post('/api/watchlist/match', async (c) => {
     errors,
     remaining: rest?.n ?? 0,
   });
+});
+
+/**
+ * マッチ確認UI: 指定作品の JustWatch 候補を返す。
+ * ?q= でクエリを上書き可（ユーザーが手入力で再検索したい場合）。
+ */
+app.get('/api/watchlist/items/:id/candidates', async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = await authenticate(c, db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+
+  const id = c.req.param('id');
+  const item = await db
+    .select()
+    .from(watchlistItems)
+    .where(and(eq(watchlistItems.id, id), eq(watchlistItems.userId, user.id)))
+    .get();
+  if (!item) return c.json({ error: 'not found' }, 404);
+
+  const overrideQuery = c.req.query('q');
+  const query = overrideQuery && overrideQuery.trim()
+    ? overrideQuery.trim()
+    : buildSearchQuery(item.service, item.title);
+
+  const nodes = await searchTitles(query);
+  const candidates: MatchCandidate[] = nodes.map((n) => ({
+    jwObjectId: n.id,
+    title: n.content?.title ?? '(タイトル不明)',
+    originalReleaseYear: n.content?.originalReleaseYear ?? null,
+    jwPath: n.content?.fullPath ?? null,
+    expiresAt: extractExpiry(n, item.service),
+  }));
+
+  const res: CandidatesResponse = { itemId: item.id, query, candidates };
+  return c.json(res);
+});
+
+/**
+ * マッチ確認UI: 候補から1件選んで手動マッチを確定する。
+ * 選んだ JustWatch ノードの情報で expires_at 等を上書きし、matchStatus='confirmed' にする。
+ */
+app.post('/api/watchlist/items/:id/match', async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = await authenticate(c, db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+
+  const id = c.req.param('id');
+  const item = await db
+    .select()
+    .from(watchlistItems)
+    .where(and(eq(watchlistItems.id, id), eq(watchlistItems.userId, user.id)))
+    .get();
+  if (!item) return c.json({ error: 'not found' }, 404);
+
+  const body = await c.req.json<ConfirmMatchRequest>().catch(() => null);
+  if (!body || typeof body.jwObjectId !== 'string' || !body.jwObjectId) {
+    return c.json({ error: 'jwObjectId required' }, 400);
+  }
+
+  // 候補リストを引き直し、jwObjectId が一致するノードを採用。
+  // タイトル検索のヒット範囲から選ぶ前提なので、再検索クエリも item の元タイトル基準。
+  const query = buildSearchQuery(item.service, item.title);
+  const nodes = await searchTitles(query);
+  const node = nodes.find((n) => n.id === body.jwObjectId);
+  if (!node) {
+    // 候補に無ければ別クエリで広く取り直す（ユーザーが手入力検索で確定したケース）。
+    // 諦めて 404 にせず、ジェネリックなタイトル検索もう1度試す。
+    const alt = await searchTitles(item.title);
+    const fallback = alt.find((n) => n.id === body.jwObjectId);
+    if (!fallback) return c.json({ error: 'candidate not found' }, 404);
+    const r = nodeToResult(fallback, item.service);
+    await db
+      .update(watchlistItems)
+      .set({ ...r, matchStatus: 'confirmed', expiryCheckedAt: Date.now() })
+      .where(eq(watchlistItems.id, item.id));
+    return c.json({ ok: true, matchStatus: 'confirmed', expiresAt: r.expiresAt });
+  }
+
+  const r = nodeToResult(node, item.service);
+  await db
+    .update(watchlistItems)
+    .set({ ...r, matchStatus: 'confirmed', expiryCheckedAt: Date.now() })
+    .where(eq(watchlistItems.id, item.id));
+  return c.json({ ok: true, matchStatus: 'confirmed', expiresAt: r.expiresAt });
+});
+
+/**
+ * マッチ確認UI: 手動で「該当作品なし」と確定する（unmatched 固定）。
+ * cron の再マッチ対象から外したい場合に使う。
+ */
+app.post('/api/watchlist/items/:id/unmatch', async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = await authenticate(c, db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+
+  const id = c.req.param('id');
+  const item = await db
+    .select()
+    .from(watchlistItems)
+    .where(and(eq(watchlistItems.id, id), eq(watchlistItems.userId, user.id)))
+    .get();
+  if (!item) return c.json({ error: 'not found' }, 404);
+
+  await db
+    .update(watchlistItems)
+    .set({
+      jwObjectId: null,
+      jwTitle: null,
+      jwPath: null,
+      expiresAt: null,
+      matchStatus: 'unmatched',
+      expiryCheckedAt: Date.now(),
+    })
+    .where(eq(watchlistItems.id, item.id));
+  return c.json({ ok: true });
 });
 
 /**

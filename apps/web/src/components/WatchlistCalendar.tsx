@@ -33,6 +33,7 @@ export function WatchlistCalendar({ items }: { items: WatchlistEntry[] }) {
     setView(({ y, m }) => (m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 }));
   const next = () =>
     setView(({ y, m }) => (m === 11 ? { y: y + 1, m: 0 } : { y, m: m + 1 }));
+  const today = () => setView({ y: now.getFullYear(), m: now.getMonth() });
 
   const todayKey =
     now.getFullYear() === view.y && now.getMonth() === view.m
@@ -45,16 +46,28 @@ export function WatchlistCalendar({ items }: { items: WatchlistEntry[] }) {
         <button onClick={prev} aria-label="前の月">
           ‹
         </button>
-        <span>
-          {view.y} 年 {view.m + 1} 月
-        </span>
+        <div className="cal-nav-center">
+          <span>
+            {view.y} 年 {view.m + 1} 月
+          </span>{' '}
+          <button
+            className="btn-ghost"
+            onClick={today}
+            style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px' }}
+          >
+            今月
+          </button>
+        </div>
         <button onClick={next} aria-label="次の月">
           ›
         </button>
       </div>
       <div className="cal-grid">
-        {WEEKDAYS.map((w) => (
-          <div key={w} className="cal-wd">
+        {WEEKDAYS.map((w, idx) => (
+          <div
+            key={w}
+            className={`cal-wd${idx === 0 ? ' sun' : ''}${idx === 6 ? ' sat' : ''}`}
+          >
             {w}
           </div>
         ))}

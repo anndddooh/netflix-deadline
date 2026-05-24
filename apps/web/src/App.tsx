@@ -1,33 +1,30 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { WatchlistEntry } from '@netflix-deadline/shared';
 import { fetchMe, fetchWatchlist, logout, type UserInfo } from './api';
 import { WatchlistList } from './components/WatchlistList';
 import { WatchlistCalendar } from './components/WatchlistCalendar';
+import { SettingsPanel } from './components/SettingsPanel';
+import { MatchReview } from './components/MatchReview';
+import { daysUntil } from './lib/date';
 
-type Tab = 'list' | 'calendar';
+type Tab = 'list' | 'calendar' | 'review' | 'settings';
 type AuthState =
   | { kind: 'loading' }
   | { kind: 'guest' }
   | { kind: 'user'; user: UserInfo };
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'list', label: '一覧' },
+  { id: 'calendar', label: 'カレンダー' },
+  { id: 'review', label: 'マッチ確認' },
+  { id: 'settings', label: '設定' },
+];
 
 export function App() {
   const [auth, setAuth] = useState<AuthState>({ kind: 'loading' });
   const [items, setItems] = useState<WatchlistEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>('list');
-  const [showExtPanel, setShowExtPanel] = useState(false);
-  const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
-
-  const copy = async (label: string, value: string) => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedLabel(label);
-      setTimeout(() => setCopiedLabel(null), 2000);
-    } catch {
-      // クリップボード API 不可の環境向けフォールバック
-      window.prompt(`${label} をコピーしてください`, value);
-    }
-  };
 
   // 起動時に認証状態を確認
   useEffect(() => {
@@ -36,109 +33,155 @@ export function App() {
       .catch(() => setAuth({ kind: 'guest' }));
   }, []);
 
+  const loadWatchlist = useCallback(async () => {
+    try {
+      const r = await fetchWatchlist();
+      setItems(r.items);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
   // ログイン済みになったらマイリストを取りに行く
   useEffect(() => {
     if (auth.kind !== 'user') return;
-    fetchWatchlist()
-      .then((r) => setItems(r.items))
-      .catch((e: unknown) => setError(String(e)));
-  }, [auth.kind]);
+    void loadWatchlist();
+  }, [auth.kind, loadWatchlist]);
+
+  const summary = useMemo(() => {
+    if (!items) return null;
+    const withExpiry = items.filter((i) => i.expiresAt);
+    const urgent = withExpiry.filter((i) => daysUntil(i.expiresAt!) <= 7).length;
+    const soon = withExpiry.filter((i) => {
+      const d = daysUntil(i.expiresAt!);
+      return d > 7 && d <= 14;
+    }).length;
+    const unmatched = items.filter((i) => i.matchStatus === 'unmatched').length;
+    return { total: items.length, withExpiry: withExpiry.length, urgent, soon, unmatched };
+  }, [items]);
 
   if (auth.kind === 'loading') {
     return (
       <main className="app">
-        <p className="muted">読み込み中…</p>
+        <div className="loading">読み込み中…</div>
       </main>
     );
   }
 
   if (auth.kind === 'guest') {
     return (
-      <main className="app">
-        <header>
-          <h1>netflix-deadline</h1>
-        </header>
-        <p>マイリスト作品の配信終了予定を一覧・カレンダー・週次メールでお知らせします。</p>
-        <p>
-          <a className="login-btn" href="/auth/google/start">
+      <main className="app landing">
+        <div className="landing-card">
+          <div className="brand">
+            <span className="brand-dot brand-dot-1" />
+            <span className="brand-dot brand-dot-2" />
+            <h1 className="brand-title">netflix-deadline</h1>
+          </div>
+          <p className="lead">
+            Netflix / Prime Video のマイリスト作品のうち、
+            <br />
+            <strong>配信終了が近いもの</strong>を見逃さないためのツール。
+          </p>
+          <ul className="features">
+            <li>一覧・カレンダーで終了予定を可視化</li>
+            <li>週1回のメールダイジェスト</li>
+            <li>Chrome 拡張でマイリストを自動取り込み</li>
+          </ul>
+          <a className="btn-primary btn-lg" href="/auth/google/start">
             Google でログイン
           </a>
-        </p>
+        </div>
       </main>
     );
   }
 
+  const user = auth.user;
+
   return (
-    <main className="app">
-      <header>
-        <h1>netflix-deadline</h1>
-        <div className="user-info">
-          <span className="muted">{auth.user.email}</span>
-          <button onClick={() => setShowExtPanel((v) => !v)}>
-            {showExtPanel ? '拡張機能設定を閉じる' : '拡張機能設定'}
-          </button>
-          <button
-            onClick={async () => {
-              await logout();
-              setAuth({ kind: 'guest' });
-              setItems(null);
-            }}
-          >
-            ログアウト
-          </button>
+    <div className="shell">
+      <header className="topbar">
+        <div className="topbar-inner">
+          <div className="brand brand-sm">
+            <span className="brand-dot brand-dot-1" />
+            <span className="brand-dot brand-dot-2" />
+            <h1 className="brand-title">netflix-deadline</h1>
+          </div>
+          <div className="user-info">
+            <span className="user-email">{user.email}</span>
+            <button
+              className="btn-ghost"
+              onClick={async () => {
+                await logout();
+                setAuth({ kind: 'guest' });
+                setItems(null);
+              }}
+            >
+              ログアウト
+            </button>
+          </div>
         </div>
-        <nav className="tabs">
-          <button
-            className={tab === 'list' ? 'active' : ''}
-            onClick={() => setTab('list')}
-          >
-            一覧
-          </button>
-          <button
-            className={tab === 'calendar' ? 'active' : ''}
-            onClick={() => setTab('calendar')}
-          >
-            カレンダー
-          </button>
+        <nav className="tabs" role="tablist">
+          <div className="tabs-inner">
+            {TABS.map((t) => (
+              <button
+                key={t.id}
+                role="tab"
+                aria-selected={tab === t.id}
+                className={`tab${tab === t.id ? ' active' : ''}`}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+                {t.id === 'review' && summary && summary.unmatched > 0 && (
+                  <span className="tab-badge">{summary.unmatched}</span>
+                )}
+              </button>
+            ))}
+          </div>
         </nav>
       </header>
 
-      {showExtPanel && (
-        <section className="ext-panel">
-          <h2>拡張機能設定</h2>
-          <p className="muted">
-            Chrome 拡張機能のポップアップに、下の2つの値を貼り付けてください。
-          </p>
-          <div className="ext-row">
-            <label>API URL</label>
-            <code>{window.location.origin}</code>
-            <button onClick={() => copy('API URL', window.location.origin)}>
-              コピー
-            </button>
+      <main className="app">
+        {summary && (tab === 'list' || tab === 'calendar') && (
+          <div className="summary">
+            <StatCard label="登録作品" value={summary.total} />
+            <StatCard label="終了予定あり" value={summary.withExpiry} />
+            <StatCard label="残り7日以内" value={summary.urgent} accent="urgent" />
+            <StatCard label="残り8〜14日" value={summary.soon} accent="soon" />
           </div>
-          <div className="ext-row">
-            <label>ペアリングトークン</label>
-            <code>{auth.user.extensionToken}</code>
-            <button
-              onClick={() => copy('ペアリングトークン', auth.user.extensionToken)}
-            >
-              コピー
-            </button>
-          </div>
-          {copiedLabel && (
-            <p className="copied">「{copiedLabel}」をコピーしました</p>
-          )}
-        </section>
-      )}
+        )}
 
-      {error && <p className="error">読み込みエラー: {error}</p>}
-      {!items && !error && <p className="muted">読み込み中…</p>}
-      {items &&
-        (tab === 'list' ? (
-          <WatchlistList items={items} />
-        ) : (
-          <WatchlistCalendar items={items} />
-        ))}
-    </main>
+        {error && <p className="msg-error">読み込みエラー: {error}</p>}
+        {!items && !error && <div className="loading">読み込み中…</div>}
+
+        {items && tab === 'list' && <WatchlistList items={items} />}
+        {items && tab === 'calendar' && <WatchlistCalendar items={items} />}
+        {items && tab === 'review' && (
+          <MatchReview items={items} onChanged={loadWatchlist} />
+        )}
+        {tab === 'settings' && (
+          <SettingsPanel
+            user={user}
+            onUpdate={(u) => setAuth({ kind: 'user', user: u })}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent?: 'urgent' | 'soon';
+}) {
+  return (
+    <div className={`stat${accent ? ' stat-' + accent : ''}`}>
+      <div className="stat-value">{value}</div>
+      <div className="stat-label">{label}</div>
+    </div>
   );
 }

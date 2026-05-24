@@ -1,7 +1,75 @@
+/* =========================================================
+ * netflix-deadline — グローバルスタイル
+ * 配色は「黒地 × Netflix赤 × Prime青」を基調にしたシック寄り。
+ * システムのカラースキームに合わせてライト／ダークを切替える。
+ * ========================================================= */
+
 :root {
-  font-family: system-ui, -apple-system, sans-serif;
-  color: #1a1a1a;
-  background: #f7f7f8;
+  /* ベース（ライト） */
+  --bg: #f5f5f7;
+  --bg-elev: #ffffff;
+  --bg-subtle: #fafafb;
+  --border: #e4e4e8;
+  --border-strong: #d4d4d9;
+  --text: #16161a;
+  --text-muted: #7a7a82;
+  --text-faint: #a8a8b0;
+
+  /* アクセント */
+  --netflix: #e50914;
+  --netflix-soft: #ffe9ea;
+  --prime: #1f6feb;
+  --prime-soft: #e3eeff;
+
+  --urgent: #dc2626;
+  --urgent-bg: #fef2f2;
+  --soon: #d97706;
+  --soon-bg: #fffaeb;
+  --ok: #047857;
+
+  --primary: #16161a;
+  --primary-text: #ffffff;
+
+  --radius: 10px;
+  --radius-sm: 6px;
+  --radius-lg: 14px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.12);
+
+  font-family:
+    "Inter", "Hiragino Kaku Gothic ProN", "Hiragino Sans", system-ui,
+    -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-feature-settings: "palt" 1, "cv11" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  color: var(--text);
+  background: var(--bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0c0c0f;
+    --bg-elev: #161619;
+    --bg-subtle: #131316;
+    --border: #2a2a30;
+    --border-strong: #3a3a42;
+    --text: #f0f0f3;
+    --text-muted: #9a9aa3;
+    --text-faint: #6a6a72;
+
+    --netflix-soft: #2b0d10;
+    --prime-soft: #0d1e3a;
+    --urgent-bg: #2c1010;
+    --soon-bg: #2c1f0a;
+
+    --primary: #f0f0f3;
+    --primary-text: #0c0c0f;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.5);
+  }
 }
 
 * {
@@ -10,152 +78,437 @@
 
 body {
   margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+button {
+  font-family: inherit;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+/* =========================================================
+ * レイアウト
+ * ========================================================= */
+
+.shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .app {
-  max-width: 880px;
+  width: 100%;
+  max-width: 1080px;
   margin: 0 auto;
-  padding: 24px 16px 64px;
+  padding: 24px 20px 64px;
 }
 
-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-h1 {
-  font-size: 20px;
-  margin: 0;
-}
-
-h2 {
-  font-size: 14px;
-  color: #555;
-  margin: 24px 0 8px;
+.loading {
+  color: var(--text-muted);
+  padding: 40px 0;
+  text-align: center;
 }
 
 .muted {
-  color: #999;
+  color: var(--text-muted);
 }
 
-.error {
-  color: #c0392b;
-}
-
-/* タブ */
-.tabs {
-  display: flex;
-  gap: 4px;
-}
-
-.tabs button {
-  padding: 6px 14px;
-  border: 1px solid #ccc;
-  background: #fff;
-  border-radius: 6px;
-  cursor: pointer;
+.msg-error {
+  color: var(--urgent);
+  background: var(--urgent-bg);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin: 12px 0;
   font-size: 13px;
 }
 
-.tabs button.active {
-  background: #1a1a1a;
-  color: #fff;
-  border-color: #1a1a1a;
+.msg-ok {
+  color: var(--ok);
+  font-size: 13px;
 }
 
-/* ユーザー情報・ログイン */
-.user-info {
+/* =========================================================
+ * トップバー & タブ
+ * ========================================================= */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  backdrop-filter: saturate(180%) blur(8px);
+}
+
+.topbar-inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 14px 20px 10px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-
-.user-info button {
-  padding: 4px 10px;
-  font-size: 12px;
-  border: 1px solid #ccc;
-  background: #fff;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.login-btn {
-  display: inline-block;
-  padding: 10px 18px;
-  background: #1a1a1a;
-  color: #fff;
-  border-radius: 6px;
-  text-decoration: none;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.login-btn:hover {
-  background: #333;
-}
-
-/* 拡張機能設定パネル */
-.ext-panel {
-  background: #fff;
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
-}
-
-.ext-panel h2 {
-  margin: 0 0 6px;
-  color: #1a1a1a;
-}
-
-.ext-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 10px 0;
+  justify-content: space-between;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
-.ext-row label {
-  font-size: 12px;
-  color: #555;
-  min-width: 130px;
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
-.ext-row code {
-  flex: 1;
-  min-width: 0;
-  font-family: ui-monospace, "SF Mono", Menlo, monospace;
-  font-size: 12px;
-  background: #f4f4f4;
-  padding: 4px 8px;
-  border-radius: 4px;
+.brand-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.brand-dot-1 {
+  background: var(--netflix);
+}
+
+.brand-dot-2 {
+  background: var(--prime);
+  margin-left: -6px;
+}
+
+.brand-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.brand-sm .brand-title {
+  font-size: 15px;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+}
+
+.user-email {
+  color: var(--text-muted);
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.ext-row button {
-  padding: 4px 10px;
-  font-size: 12px;
-  border: 1px solid #ccc;
-  background: #fff;
-  border-radius: 4px;
+.tabs {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+
+.tabs-inner {
+  display: flex;
+  gap: 4px;
+  padding: 0 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs-inner::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  position: relative;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: color 0.15s, border-color 0.15s;
 }
 
-.copied {
-  color: #2a7a2a;
+.tab:hover {
+  color: var(--text);
+}
+
+.tab.active {
+  color: var(--text);
+  border-bottom-color: var(--netflix);
+}
+
+.tab-badge {
+  background: var(--urgent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+}
+
+/* =========================================================
+ * ボタン
+ * ========================================================= */
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  color: var(--primary-text);
+  border: 1px solid var(--primary);
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity 0.15s, transform 0.05s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.btn-primary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.btn-lg {
+  padding: 12px 24px;
+  font-size: 14px;
+  border-radius: var(--radius);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elev);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.2;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--bg-subtle);
+  border-color: var(--border-strong);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-ghost.danger {
+  color: var(--urgent);
+}
+
+/* =========================================================
+ * ランディング（未ログイン）
+ * ========================================================= */
+
+.landing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+
+.landing-card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 40px;
+  max-width: 480px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+
+.landing-card .brand {
+  justify-content: center;
+  margin-bottom: 20px;
+}
+
+.landing-card .brand-title {
+  font-size: 22px;
+}
+
+.lead {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-muted);
+  margin: 16px 0 24px;
+}
+
+.lead strong {
+  color: var(--text);
+}
+
+.features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 32px;
+  text-align: left;
+  display: inline-block;
+}
+
+.features li {
+  position: relative;
+  padding: 6px 0 6px 24px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.features li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--ok);
+  font-weight: 700;
+}
+
+/* =========================================================
+ * サマリーカード
+ * ========================================================= */
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.stat {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
   font-size: 12px;
-  margin: 4px 0 0;
+  color: var(--text-muted);
+  margin-top: 2px;
 }
 
-/* 一覧 */
+.stat-urgent .stat-value {
+  color: var(--urgent);
+}
+
+.stat-soon .stat-value {
+  color: var(--soon);
+}
+
+/* =========================================================
+ * カード共通
+ * ========================================================= */
+
+.card {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.card-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--text);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.card-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 16px;
+  line-height: 1.6;
+}
+
+/* =========================================================
+ * サービスバッジ
+ * ========================================================= */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 3px 7px;
+  border-radius: 4px;
+  color: #fff;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.badge.netflix {
+  background: var(--netflix);
+}
+
+.badge.prime {
+  background: var(--prime);
+}
+
+/* =========================================================
+ * 一覧
+ * ========================================================= */
+
+.list-section {
+  margin-bottom: 20px;
+}
+
+.list-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin: 0 0 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .entries {
   list-style: none;
   margin: 0;
@@ -168,11 +521,16 @@ h2 {
 .entry {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: #fff;
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color 0.15s, transform 0.05s;
+}
+
+.entry:hover {
+  border-color: var(--border-strong);
 }
 
 .entry .title {
@@ -181,68 +539,88 @@ h2 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 14px;
 }
 
 .entry .days {
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.entry .date {
-  color: #888;
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.entry.soon {
-  border-color: #e8a13a;
-  background: #fff8ee;
-}
-
-.entry.urgent {
-  border-color: #c0392b;
-  background: #fdeeec;
-}
-
-.entry.urgent .days {
-  color: #c0392b;
-}
-
-/* サービスバッジ */
-.badge {
-  font-size: 11px;
   font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: #fff;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
-.badge.netflix {
-  background: #e50914;
+.entry .date {
+  color: var(--text-faint);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
-.badge.prime {
-  background: #1f6feb;
+.entry.soon {
+  border-color: var(--soon);
+  background: var(--soon-bg);
 }
 
-/* カレンダー */
+.entry.soon .days {
+  color: var(--soon);
+}
+
+.entry.urgent {
+  border-color: var(--urgent);
+  background: var(--urgent-bg);
+}
+
+.entry.urgent .days {
+  color: var(--urgent);
+}
+
+.entry-meta {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+/* =========================================================
+ * カレンダー
+ * ========================================================= */
+
+.calendar {
+  background: var(--bg-elev);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
 .cal-nav {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.cal-nav-center {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .cal-nav button {
-  width: 32px;
-  height: 32px;
-  border: 1px solid #ccc;
-  background: #fff;
-  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border);
+  background: var(--bg-elev);
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 16px;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cal-nav button:hover {
+  background: var(--bg-subtle);
 }
 
 .cal-grid {
@@ -253,17 +631,28 @@ h2 {
 
 .cal-wd {
   text-align: center;
-  font-size: 12px;
-  color: #888;
+  font-size: 11px;
+  color: var(--text-muted);
   padding: 4px 0;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.cal-wd.sun {
+  color: var(--netflix);
+}
+
+.cal-wd.sat {
+  color: var(--prime);
 }
 
 .cal-cell {
-  min-height: 84px;
-  background: #fff;
-  border: 1px solid #e5e5e5;
-  border-radius: 6px;
-  padding: 4px;
+  min-height: 88px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px;
+  overflow: hidden;
 }
 
 .cal-cell.empty {
@@ -272,30 +661,318 @@ h2 {
 }
 
 .cal-cell.today {
-  border-color: #1a1a1a;
+  border-color: var(--netflix);
+  box-shadow: inset 0 0 0 1px var(--netflix);
 }
 
 .cal-day {
   font-size: 12px;
-  color: #555;
-  margin-bottom: 2px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.cal-cell.today .cal-day {
+  color: var(--netflix);
 }
 
 .cal-item {
   font-size: 10px;
   color: #fff;
-  padding: 1px 4px;
+  padding: 2px 6px;
   border-radius: 3px;
   margin-bottom: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: 500;
 }
 
 .cal-item.netflix {
-  background: #e50914;
+  background: var(--netflix);
 }
 
 .cal-item.prime {
-  background: #1f6feb;
+  background: var(--prime);
+}
+
+@media (max-width: 720px) {
+  .cal-cell {
+    min-height: 64px;
+  }
+  .cal-item {
+    font-size: 9px;
+    padding: 1px 4px;
+  }
+}
+
+/* =========================================================
+ * 設定タブ
+ * ========================================================= */
+
+.form-row {
+  margin: 14px 0;
+}
+
+.form-row > label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.form-row input[type="email"],
+.form-row input[type="number"] {
+  width: 100%;
+  max-width: 320px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  font-size: 14px;
+  color: var(--text);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.form-row input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--bg-elev);
+}
+
+.threshold-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.threshold-input input[type="number"] {
+  max-width: 100px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.weekday-picker {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.weekday-btn {
+  width: 36px;
+  height: 36px;
+  background: var(--bg-elev);
+  border: none;
+  border-right: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.weekday-btn:last-child {
+  border-right: none;
+}
+
+.weekday-btn:hover:not(.active) {
+  background: var(--bg-subtle);
+  color: var(--text);
+}
+
+.weekday-btn.active {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.kv-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+
+.kv-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  min-width: 130px;
+}
+
+.kv-value {
+  flex: 1;
+  min-width: 0;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* =========================================================
+ * マッチ確認UI
+ * ========================================================= */
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.review-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.review-row {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.review-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+}
+
+.review-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.review-current {
+  font-size: 12px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.review-body {
+  background: var(--bg-elev);
+  border-top: 1px solid var(--border);
+  padding: 14px;
+}
+
+.search-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.search-bar input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-subtle);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.search-bar input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--bg-elev);
+}
+
+.candidate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.candidate {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  flex-wrap: wrap;
+}
+
+.cand-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cand-title {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.cand-expiry {
+  font-size: 12px;
+  color: var(--soon);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.cand-link {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.cand-link:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+
+.review-footer {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 600px) {
+  .review-head {
+    flex-wrap: wrap;
+  }
+  .review-current {
+    max-width: 100%;
+    flex-basis: 100%;
+  }
+  .kv-label {
+    min-width: 0;
+    flex-basis: 100%;
+  }
 }

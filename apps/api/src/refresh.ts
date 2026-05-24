@@ -1,7 +1,8 @@
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { asc, eq } from 'drizzle-orm';
 import { watchlistItems } from './db/schema';
-import { matchItem } from './matching';
+import { buildSearchQuery, extractExpiry, matchItem } from './matching';
+import { searchTitles } from './justwatch';
 
 export interface RefreshStats {
   processed: number;
@@ -44,20 +45,37 @@ export async function refreshStalest(
   for (const item of items) {
     stats.processed++;
     try {
-      const r = await matchItem({ service: item.service, title: item.title });
-      await db
-        .update(watchlistItems)
-        .set({
-          jwObjectId: r.jwObjectId,
-          jwTitle: r.jwTitle,
-          jwPath: r.jwPath,
-          expiresAt: r.expiresAt,
-          matchStatus: r.matchStatus,
-          expiryCheckedAt: now,
-        })
-        .where(eq(watchlistItems.id, item.id));
-      if (r.matchStatus === 'matched') stats.matched++;
-      else stats.unmatched++;
+      // 手動確定済み (confirmed) はユーザーの選択を覆さない。
+      // 同じタイトル検索を引き、確定した jwObjectId が見つかれば expiresAt を更新するだけ。
+      if (item.matchStatus === 'confirmed' && item.jwObjectId) {
+        const nodes = await searchTitles(
+          buildSearchQuery(item.service, item.title)
+        );
+        const node = nodes.find((n) => n.id === item.jwObjectId);
+        await db
+          .update(watchlistItems)
+          .set({
+            expiresAt: node ? extractExpiry(node, item.service) : item.expiresAt,
+            expiryCheckedAt: now,
+          })
+          .where(eq(watchlistItems.id, item.id));
+        stats.matched++;
+      } else {
+        const r = await matchItem({ service: item.service, title: item.title });
+        await db
+          .update(watchlistItems)
+          .set({
+            jwObjectId: r.jwObjectId,
+            jwTitle: r.jwTitle,
+            jwPath: r.jwPath,
+            expiresAt: r.expiresAt,
+            matchStatus: r.matchStatus,
+            expiryCheckedAt: now,
+          })
+          .where(eq(watchlistItems.id, item.id));
+        if (r.matchStatus === 'matched') stats.matched++;
+        else stats.unmatched++;
+      }
     } catch {
       stats.errors++;
     }

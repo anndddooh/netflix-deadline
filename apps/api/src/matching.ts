@@ -77,11 +77,23 @@ export async function matchItem(input: {
     nodes.find((n) => normalizeTitle(n.content?.title ?? '') === want) ??
     nodes[0]!;
 
+  return nodeToResult(node, input.service);
+}
+
+/** 検索クエリ用にタイトルを整える（マッチ確認UIから利用） */
+export function buildSearchQuery(service: StreamingService, title: string): string {
+  return service === 'prime' ? stripForQuery(title) : title;
+}
+
+/** 1ノードをサービス文脈の MatchResult に変換 */
+export function nodeToResult(node: JwNode, service: StreamingService): MatchResult {
   return {
     jwObjectId: node.id,
     jwTitle: node.content?.title ?? null,
     jwPath: node.content?.fullPath ?? null,
-    expiresAt: extractExpiry(node, input.service),
+    expiresAt: extractExpiry(node, service),
     matchStatus: 'matched',
   };
 }
+
+export { extractExpiry };

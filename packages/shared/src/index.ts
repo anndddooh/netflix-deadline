@@ -54,3 +54,35 @@ export interface WatchlistEntry {
 export interface GetWatchlistResponse {
   items: WatchlistEntry[];
 }
+
+/** PATCH /auth/me のリクエスト（通知設定） */
+export interface UpdateSettingsRequest {
+  notifyEmail?: string;
+  /** 0=日 .. 6=土 */
+  digestWeekday?: number;
+  /** 残り日数の閾値 */
+  thresholdDays?: number;
+}
+
+/** JustWatch 候補（マッチ確認UIで提示する1件） */
+export interface MatchCandidate {
+  /** JustWatch のノードID（手動マッチ確定時に渡す） */
+  jwObjectId: string;
+  title: string;
+  originalReleaseYear: number | null;
+  jwPath: string | null;
+  /** このサービスでの配信終了日 'YYYY-MM-DD'。無ければ null */
+  expiresAt: string | null;
+}
+
+/** GET /api/watchlist/items/:id/candidates のレスポンス */
+export interface CandidatesResponse {
+  itemId: string;
+  query: string;
+  candidates: MatchCandidate[];
+}
+
+/** POST /api/watchlist/items/:id/match のリクエスト（手動マッチ確定） */
+export interface ConfirmMatchRequest {
+  jwObjectId: string;
+}
