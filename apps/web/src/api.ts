@@ -2,18 +2,12 @@ import type {
   CandidatesResponse,
   ConfirmMatchRequest,
   GetWatchlistResponse,
+  LinkCodeResponse,
   UpdateSettingsRequest,
+  UserInfoResponse,
 } from '@netflix-deadline/shared';
 
-export interface UserInfo {
-  id: string;
-  email: string;
-  name: string | null;
-  extensionToken: string;
-  notifyEmail: string;
-  digestWeekday: number;
-  thresholdDays: number;
-}
+export type UserInfo = UserInfoResponse;
 
 /** /auth/me を呼ぶ。未認証なら null。 */
 export async function fetchMe(): Promise<UserInfo | null> {
@@ -80,4 +74,36 @@ export async function runMatch(): Promise<{ processed: number; matched: number; 
   const res = await fetch('/api/watchlist/match', { method: 'POST' });
   if (!res.ok) throw new Error(`再マッチに失敗（${res.status}）`);
   return res.json();
+}
+
+/** LINE 連携コード発行（6 桁、10 分有効） */
+export async function issueLineLinkCode(): Promise<LinkCodeResponse> {
+  const res = await fetch('/api/line/link-code', { method: 'POST' });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`LINE コード発行に失敗（${res.status}）: ${text.slice(0, 120)}`);
+  }
+  return res.json();
+}
+
+/** LINE 連携解除 */
+export async function unlinkLine(): Promise<void> {
+  const res = await fetch('/api/line/unlink', { method: 'POST' });
+  if (!res.ok) throw new Error(`LINE 連携解除に失敗（${res.status}）`);
+}
+
+/** Alexa 連携コード発行 */
+export async function issueAlexaLinkCode(): Promise<LinkCodeResponse> {
+  const res = await fetch('/api/alexa/link-code', { method: 'POST' });
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Alexa コード発行に失敗（${res.status}）: ${text.slice(0, 120)}`);
+  }
+  return res.json();
+}
+
+/** Alexa 連携解除 */
+export async function unlinkAlexa(): Promise<void> {
+  const res = await fetch('/api/alexa/unlink', { method: 'POST' });
+  if (!res.ok) throw new Error(`Alexa 連携解除に失敗（${res.status}）`);
 }

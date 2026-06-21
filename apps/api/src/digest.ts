@@ -1,5 +1,6 @@
 // 週次ダイジェストの組み立てと送信。
 // 毎日1回 cron から呼び出され、その曜日が digestWeekday に合うユーザーにだけ送る。
+// 送信先はユーザー設定で有効化された全チャンネル（メール / LINE / Alexa）。
 
 import type { DrizzleD1Database } from 'drizzle-orm/d1';
 import { and, asc, eq, isNotNull, lte } from 'drizzle-orm';
@@ -9,7 +10,12 @@ import {
   type User,
   type WatchlistItem,
 } from './db/schema';
-import type { EmailSender, EmailMessage } from './email';
+import {
+  dispatchDigest,
+  anySent,
+  type DigestPayload,
+  type NotifierContext,
+} from './notifier';
 
 const SERVICE_LABEL: Record<string, string> = {
   netflix: 'Netflix',
@@ -31,12 +37,12 @@ function daysUntil(now: Date, ymd: string): number {
   return Math.round((target.getTime() - today.getTime()) / 86_400_000);
 }
 
-/** ダイジェスト本文を組み立てる。送る作品が無ければ null */
+/** チャンネル中立のダイジェストペイロードを組み立てる。送る作品が無ければ null */
 export function buildDigest(
   user: User,
   items: WatchlistItem[],
   now: Date
-): EmailMessage | null {
+): DigestPayload | null {
   if (items.length === 0) return null;
 
   const lines = items.map((i) => {
@@ -64,10 +70,10 @@ export function buildDigest(
     `<p style="color:#888;font-size:12px;">netflix-deadline からの週次ダイジェスト</p>`;
 
   return {
-    to: user.notifyEmail,
     subject: `[netflix-deadline] 配信終了が近い作品 ${items.length} 件`,
     text,
     html,
+    count: items.length,
   };
 }
 
@@ -84,7 +90,7 @@ export async function buildDigestForUser(
   db: DrizzleD1Database,
   user: User,
   now: Date
-): Promise<EmailMessage | null> {
+): Promise<DigestPayload | null> {
   const threshold = isoDateOffset(now, user.thresholdDays);
   const items = await db
     .select()
@@ -114,7 +120,7 @@ export interface DigestRunStats {
  */
 export async function runWeeklyDigests(
   db: DrizzleD1Database,
-  sender: EmailSender,
+  notifier: NotifierContext,
   now: Date
 ): Promise<DigestRunStats> {
   const weekday = now.getDay(); // 0=日 .. 6=土
@@ -132,17 +138,15 @@ export async function runWeeklyDigests(
       stats.skipped++;
       continue;
     }
-    try {
-      const msg = await buildDigestForUser(db, u, now);
-      if (!msg) {
-        stats.skipped++;
-        continue;
-      }
-      await sender.send(msg);
-      stats.sent++;
-    } catch {
-      stats.errors++;
+    const payload = await buildDigestForUser(db, u, now);
+    if (!payload) {
+      stats.skipped++;
+      continue;
     }
+    const r = await dispatchDigest(notifier, u, payload);
+    if (anySent(r)) stats.sent++;
+    else if (Object.keys(r.errors).length > 0) stats.errors++;
+    else stats.skipped++;
   }
   return stats;
 }

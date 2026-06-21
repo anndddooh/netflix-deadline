@@ -25,9 +25,21 @@
   },
 
   // 非機密の環境変数。
-  // 機密値（GOOGLE_CLIENT_SECRET / RESEND_API_KEY / SESSION_SECRET）は
-  // `wrangler secret put` で別途設定する。
+  // 機密値は `wrangler secret put` で別途設定する:
+  //   - GOOGLE_CLIENT_SECRET
+  //   - RESEND_API_KEY
+  //   - SESSION_SECRET
+  //   - LINE_CHANNEL_ACCESS_TOKEN  (LINE Messaging API、未設定なら LINE 機能 OFF)
+  //   - LINE_CHANNEL_SECRET        (LINE webhook 署名検証)
+  //   - ALEXA_CLIENT_ID            (Alexa Proactive Events、未設定なら Alexa 機能 OFF)
+  //   - ALEXA_CLIENT_SECRET
+  //   - ALEXA_LINK_SECRET          (Alexa スキル → /api/alexa/link の共有鍵)
   // OAUTH_REDIRECT_URI / WEB_BASE は初回デプロイで URL が判明したら追記する。
+  // ALEXA_API_BASE は Proactive Events の送信先 URL の完全形。
+  // 未設定なら本番ステージ (https://api.amazonalexa.com/v1/proactiveEvents)。
+  // 公開前の開発スキルから送るときだけ
+  //   ALEXA_API_BASE=https://api.amazonalexa.com/v1/proactiveEvents/stages/development
+  // を vars に追加する。
   "vars": {
     "EMAIL_FROM": "onboarding@resend.dev",
     "GOOGLE_CLIENT_ID": "209442782190-8h8celjv7np71i60vsutcbe58kh3aon7.apps.googleusercontent.com",

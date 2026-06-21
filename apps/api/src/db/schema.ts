@@ -21,6 +21,33 @@ export const users = sqliteTable('users', {
   digestWeekday: integer('digest_weekday').notNull().default(1),
   /** 「終了まで残り N 日以内」の閾値（既定 14 日） */
   thresholdDays: integer('threshold_days').notNull().default(14),
+  // --- 通知チャンネルの有効/無効 ---
+  /** メール通知を有効にするか（既定 true） */
+  notifyEmailEnabled: integer('notify_email_enabled', { mode: 'boolean' })
+    .notNull()
+    .default(true),
+  /** LINE 通知を有効にするか（lineUserId が紐付いていれば送る） */
+  notifyLineEnabled: integer('notify_line_enabled', { mode: 'boolean' })
+    .notNull()
+    .default(false),
+  /** Alexa 通知（Proactive Events）を有効にするか */
+  notifyAlexaEnabled: integer('notify_alexa_enabled', { mode: 'boolean' })
+    .notNull()
+    .default(false),
+  // --- LINE Messaging API 連携 ---
+  /** LINE のユーザーID（Push 先）。webhook の follow + 連携コードで紐付ける */
+  lineUserId: text('line_user_id'),
+  /** 連携コード（ユーザーが LINE bot に送って紐付ける 6 桁数値） */
+  lineLinkCode: text('line_link_code'),
+  /** 連携コードの有効期限 unix ms */
+  lineLinkExpiresAt: integer('line_link_expires_at'),
+  // --- Alexa Proactive Events 連携 ---
+  /** Alexa のユーザーID（amzn1.ask.account.XXX）。スキル経由のアカウントリンクで取得 */
+  alexaUserId: text('alexa_user_id'),
+  /** 連携コード（Alexa スキルが「コード言ってください」で受け取り、API に送って紐付け） */
+  alexaLinkCode: text('alexa_link_code'),
+  /** Alexa 連携コードの有効期限 unix ms */
+  alexaLinkExpiresAt: integer('alexa_link_expires_at'),
   createdAt: integer('created_at').notNull(),
 });
 

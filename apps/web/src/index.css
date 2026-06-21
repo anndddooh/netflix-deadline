@@ -885,6 +885,149 @@ a {
 }
 
 /* =========================================================
+ * 通知チャンネル / 連携セクション
+ * ========================================================= */
+
+.channel-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.channel-row:last-child {
+  border-bottom: none;
+}
+
+.channel-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.channel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.channel-desc {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.badge-linked,
+.badge-unlinked {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+.badge-linked {
+  background: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+}
+
+.badge-unlinked {
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+}
+
+.channel-toggle {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.channel-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.channel-toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.channel-toggle-track::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.15s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.channel-toggle input:checked + .channel-toggle-track {
+  background: var(--primary);
+}
+
+.channel-toggle input:checked + .channel-toggle-track::before {
+  transform: translateX(20px);
+}
+
+.channel-toggle.disabled .channel-toggle-track {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.step-list {
+  margin: 8px 0 16px;
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+.step-list code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px;
+  background: var(--bg-subtle);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.link-code-box {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 16px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.link-code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--primary);
+}
+
+.link-code-hint {
+  font-size: 12px;
+}
+
+/* =========================================================
  * マッチ確認UI
  * ========================================================= */
 

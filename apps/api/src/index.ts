@@ -9,6 +9,7 @@ import type {
   SyncWatchlistRequest,
   SyncWatchlistResponse,
   UpdateSettingsRequest,
+  UserInfoResponse,
   WatchlistEntry,
 } from '@netflix-deadline/shared';
 import { users, watchlistItems, type User } from './db/schema';
@@ -22,6 +23,20 @@ import { searchTitles } from './justwatch';
 import { refreshStalest } from './refresh';
 import { buildDigestForUser, runWeeklyDigests } from './digest';
 import { senderFromEnv } from './email';
+import { dispatchDigest } from './notifier';
+import {
+  generateLinkCode as generateLineLinkCode,
+  handleWebhook as handleLineWebhook,
+  lineConfigFromEnv,
+  LINK_CODE_TTL_MS as LINE_LINK_TTL_MS,
+  verifySignature as verifyLineSignature,
+} from './line';
+import {
+  alexaConfigFromEnv,
+  generateLinkCode as generateAlexaLinkCode,
+  linkAlexaUser,
+  LINK_CODE_TTL_MS as ALEXA_LINK_TTL_MS,
+} from './alexa';
 import { randomString, readCookie, signSession, verifySession } from './auth';
 import {
   exchangeCode,
@@ -43,6 +58,15 @@ type Bindings = {
   SESSION_SECRET?: string;
   // ログイン後のリダイレクト先（Web アプリ）
   WEB_BASE?: string;
+  // LINE Messaging API
+  LINE_CHANNEL_ACCESS_TOKEN?: string;
+  LINE_CHANNEL_SECRET?: string;
+  // Alexa
+  ALEXA_CLIENT_ID?: string;
+  ALEXA_CLIENT_SECRET?: string;
+  ALEXA_API_BASE?: string;
+  /** Alexa スキル → /api/alexa/link の認証共有鍵 */
+  ALEXA_LINK_SECRET?: string;
 };
 type Db = DrizzleD1Database;
 type Ctx = Context<{ Bindings: Bindings }>;
@@ -94,6 +118,23 @@ async function authenticate(c: Ctx, db: Db): Promise<User | null> {
   return null;
 }
 
+function toUserInfo(u: User): UserInfoResponse {
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.name,
+    extensionToken: u.extensionToken,
+    notifyEmail: u.notifyEmail,
+    digestWeekday: u.digestWeekday,
+    thresholdDays: u.thresholdDays,
+    notifyEmailEnabled: u.notifyEmailEnabled,
+    notifyLineEnabled: u.notifyLineEnabled,
+    notifyAlexaEnabled: u.notifyAlexaEnabled,
+    lineLinked: !!u.lineUserId,
+    alexaLinked: !!u.alexaUserId,
+  };
+}
+
 /**
  * Google のユーザー情報から、既存ユーザーを引くか新規作成する。
  * googleSub のみで照合する（email は一致しても他人の可能性があるため使わない）。
@@ -118,6 +159,15 @@ async function findOrCreateUser(
     notifyEmail: info.email,
     digestWeekday: 1,
     thresholdDays: 14,
+    notifyEmailEnabled: true,
+    notifyLineEnabled: false,
+    notifyAlexaEnabled: false,
+    lineUserId: null,
+    lineLinkCode: null,
+    lineLinkExpiresAt: null,
+    alexaUserId: null,
+    alexaLinkCode: null,
+    alexaLinkExpiresAt: null,
     createdAt: Date.now(),
   };
   await db.insert(users).values(created);
@@ -201,20 +251,12 @@ app.get('/auth/me', async (c) => {
   const db = drizzle(c.env.DB);
   const user = await authenticate(c, db);
   if (!user) return c.json({ error: 'unauthorized' }, 401);
-  return c.json({
-    id: user.id,
-    email: user.email,
-    name: user.name,
-    extensionToken: user.extensionToken,
-    notifyEmail: user.notifyEmail,
-    digestWeekday: user.digestWeekday,
-    thresholdDays: user.thresholdDays,
-  });
+  return c.json(toUserInfo(user));
 });
 
 /**
- * 通知設定の更新。送信曜日（0..6）・閾値日数（1..365）・通知先メールを差分更新する。
- * 拡張機能のペアリングトークンでも更新可（拡張からは notifyEmail 等は触らない想定だが許容）。
+ * 通知設定の更新。送信曜日（0..6）・閾値日数（1..365）・通知先メール・
+ * 各チャンネルの ON/OFF を差分更新する。
  */
 app.patch('/auth/me', async (c) => {
   const db = drizzle(c.env.DB);
@@ -226,7 +268,17 @@ app.patch('/auth/me', async (c) => {
     return c.json({ error: 'invalid body' }, 400);
   }
 
-  const patch: Partial<Pick<User, 'notifyEmail' | 'digestWeekday' | 'thresholdDays'>> = {};
+  const patch: Partial<
+    Pick<
+      User,
+      | 'notifyEmail'
+      | 'digestWeekday'
+      | 'thresholdDays'
+      | 'notifyEmailEnabled'
+      | 'notifyLineEnabled'
+      | 'notifyAlexaEnabled'
+    >
+  > = {};
 
   if (body.notifyEmail !== undefined) {
     if (typeof body.notifyEmail !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.notifyEmail)) {
@@ -246,22 +298,38 @@ app.patch('/auth/me', async (c) => {
     }
     patch.thresholdDays = body.thresholdDays;
   }
+  if (body.notifyEmailEnabled !== undefined) {
+    if (typeof body.notifyEmailEnabled !== 'boolean') {
+      return c.json({ error: 'notifyEmailEnabled must be boolean' }, 400);
+    }
+    patch.notifyEmailEnabled = body.notifyEmailEnabled;
+  }
+  if (body.notifyLineEnabled !== undefined) {
+    if (typeof body.notifyLineEnabled !== 'boolean') {
+      return c.json({ error: 'notifyLineEnabled must be boolean' }, 400);
+    }
+    // LINE 未連携で ON にしようとしたら拒否（紛らわしいので）
+    if (body.notifyLineEnabled && !user.lineUserId) {
+      return c.json({ error: 'LINE が未連携です' }, 400);
+    }
+    patch.notifyLineEnabled = body.notifyLineEnabled;
+  }
+  if (body.notifyAlexaEnabled !== undefined) {
+    if (typeof body.notifyAlexaEnabled !== 'boolean') {
+      return c.json({ error: 'notifyAlexaEnabled must be boolean' }, 400);
+    }
+    if (body.notifyAlexaEnabled && !user.alexaUserId) {
+      return c.json({ error: 'Alexa が未連携です' }, 400);
+    }
+    patch.notifyAlexaEnabled = body.notifyAlexaEnabled;
+  }
 
   if (Object.keys(patch).length === 0) {
     return c.json({ error: 'no fields to update' }, 400);
   }
 
   await db.update(users).set(patch).where(eq(users.id, user.id));
-  const updated = { ...user, ...patch };
-  return c.json({
-    id: updated.id,
-    email: updated.email,
-    name: updated.name,
-    extensionToken: updated.extensionToken,
-    notifyEmail: updated.notifyEmail,
-    digestWeekday: updated.digestWeekday,
-    thresholdDays: updated.thresholdDays,
-  });
+  return c.json(toUserInfo({ ...user, ...patch }));
 });
 
 /** ログアウト（セッションクッキーを失効させる） */
@@ -270,6 +338,133 @@ app.post('/auth/logout', (c) => {
     'Set-Cookie',
     `${SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0`
   );
+  return c.json({ ok: true });
+});
+
+// ====================== LINE 連携 ======================
+
+/**
+ * LINE 連携コード（6 桁）を発行する。10 分有効。
+ * ユーザーは bot にこのコードを送ることで紐付けを完了する。
+ */
+app.post('/api/line/link-code', async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = await authenticate(c, db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+  if (!lineConfigFromEnv(c.env)) {
+    return c.json({ error: 'LINE が未設定（管理者が LINE_CHANNEL_* を設定してください）' }, 503);
+  }
+
+  const code = generateLineLinkCode();
+  const expiresAt = Date.now() + LINE_LINK_TTL_MS;
+  await db
+    .update(users)
+    .set({ lineLinkCode: code, lineLinkExpiresAt: expiresAt })
+    .where(eq(users.id, user.id));
+  return c.json({ code, expiresAt });
+});
+
+/** LINE 連携を解除する */
+app.post('/api/line/unlink', async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = await authenticate(c, db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+  await db
+    .update(users)
+    .set({
+      lineUserId: null,
+      lineLinkCode: null,
+      lineLinkExpiresAt: null,
+      notifyLineEnabled: false,
+    })
+    .where(eq(users.id, user.id));
+  return c.json({ ok: true });
+});
+
+/**
+ * LINE Messaging API の webhook。署名検証 → 6 桁コードで紐付け処理。
+ * LINE 仕様: どんな場合でも 200 を返すこと（再送ループを避ける）。
+ */
+app.post('/api/line/webhook', async (c) => {
+  const cfg = lineConfigFromEnv(c.env);
+  if (!cfg) {
+    // 未設定でも 200 を返しておく（運用前の検証コール想定）
+    return c.body(null, 200);
+  }
+  const raw = await c.req.text();
+  const signature = c.req.header('x-line-signature');
+  const ok = await verifyLineSignature(cfg.channelSecret, raw, signature);
+  if (!ok) {
+    // 署名不一致は明示的に 401 を返す（LINE は再送しない）
+    return c.json({ error: 'invalid signature' }, 401);
+  }
+  const body = JSON.parse(raw);
+  const db = drizzle(c.env.DB);
+  // 例外を呑んでも 200 を返す
+  c.executionCtx.waitUntil(handleLineWebhook(cfg, db, body).catch((e) => {
+    console.error('[line webhook] failed:', e);
+  }));
+  return c.body(null, 200);
+});
+
+// ====================== Alexa 連携 ======================
+
+/**
+ * Alexa 連携コード（6 桁）を発行する。10 分有効。
+ * ユーザーは Alexa スキルでこのコードを発話し、スキル側が /api/alexa/link を叩く。
+ */
+app.post('/api/alexa/link-code', async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = await authenticate(c, db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+  if (!alexaConfigFromEnv(c.env)) {
+    return c.json({ error: 'Alexa が未設定（管理者が ALEXA_CLIENT_* を設定してください）' }, 503);
+  }
+
+  const code = generateAlexaLinkCode();
+  const expiresAt = Date.now() + ALEXA_LINK_TTL_MS;
+  await db
+    .update(users)
+    .set({ alexaLinkCode: code, alexaLinkExpiresAt: expiresAt })
+    .where(eq(users.id, user.id));
+  return c.json({ code, expiresAt });
+});
+
+/** Alexa 連携解除 */
+app.post('/api/alexa/unlink', async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = await authenticate(c, db);
+  if (!user) return c.json({ error: 'unauthorized' }, 401);
+  await db
+    .update(users)
+    .set({
+      alexaUserId: null,
+      alexaLinkCode: null,
+      alexaLinkExpiresAt: null,
+      notifyAlexaEnabled: false,
+    })
+    .where(eq(users.id, user.id));
+  return c.json({ ok: true });
+});
+
+/**
+ * Alexa スキル → API への紐付け要求受け口。
+ * Authorization: Bearer <ALEXA_LINK_SECRET> で認証する（共有鍵方式）。
+ * Body: { code: "123456", alexaUserId: "amzn1.ask.account.XXX" }
+ */
+app.post('/api/alexa/link', async (c) => {
+  const secret = c.env.ALEXA_LINK_SECRET;
+  if (!secret) return c.json({ error: 'not configured' }, 503);
+  if (bearer(c.req.header('Authorization')) !== secret) {
+    return c.json({ error: 'unauthorized' }, 401);
+  }
+  const body = await c.req.json<{ code?: string; alexaUserId?: string }>().catch(() => null);
+  if (!body || !body.code || !body.alexaUserId) {
+    return c.json({ error: 'code and alexaUserId required' }, 400);
+  }
+  const db = drizzle(c.env.DB);
+  const r = await linkAlexaUser(db, body.code, body.alexaUserId);
+  if (!r.ok) return c.json({ ok: false, reason: r.reason }, 400);
   return c.json({ ok: true });
 });
 
@@ -602,30 +797,27 @@ app.get('/api/digest/preview', async (c) => {
   const db = drizzle(c.env.DB);
   const user = await authenticate(c, db);
   if (!user) return c.json({ error: 'unauthorized' }, 401);
-  const msg = await buildDigestForUser(db, user, new Date());
-  if (!msg) return c.json({ message: '配信終了予定の作品が無いため空' });
-  return c.json(msg);
+  const payload = await buildDigestForUser(db, user, new Date());
+  if (!payload) return c.json({ message: '配信終了予定の作品が無いため空' });
+  return c.json(payload);
 });
 
 /**
- * 即時にダイジェストを生成・送信する（曜日は無視）。動作確認用。
+ * 即時にダイジェストを生成・送信する（曜日は無視、全有効チャンネルへ）。動作確認用。
  */
 app.post('/api/digest/run', async (c) => {
   const db = drizzle(c.env.DB);
   const user = await authenticate(c, db);
   if (!user) return c.json({ error: 'unauthorized' }, 401);
-  const msg = await buildDigestForUser(db, user, new Date());
-  if (!msg) return c.json({ sent: false, reason: '配信終了予定の作品が無い' });
-  const sender = senderFromEnv(c.env);
-  try {
-    await sender.send(msg);
-    return c.json({ sent: true, to: msg.to, subject: msg.subject });
-  } catch (e) {
-    return c.json(
-      { sent: false, error: e instanceof Error ? e.message : String(e) },
-      500
-    );
-  }
+  const payload = await buildDigestForUser(db, user, new Date());
+  if (!payload) return c.json({ sent: false, reason: '配信終了予定の作品が無い' });
+  const notifier = {
+    email: senderFromEnv(c.env),
+    line: lineConfigFromEnv(c.env),
+    alexa: alexaConfigFromEnv(c.env),
+  };
+  const r = await dispatchDigest(notifier, user, payload);
+  return c.json({ result: r });
 });
 
 /**
@@ -650,9 +842,13 @@ const scheduled: ExportedHandlerScheduledHandler<Bindings> = async (
         .catch((e: unknown) => console.error('[cron refresh] failed:', e))
     );
   } else if (event.cron === '0 23 * * *') {
-    const sender = senderFromEnv(env);
+    const notifier = {
+      email: senderFromEnv(env),
+      line: lineConfigFromEnv(env),
+      alexa: alexaConfigFromEnv(env),
+    };
     ctx.waitUntil(
-      runWeeklyDigests(db, sender, new Date())
+      runWeeklyDigests(db, notifier, new Date())
         .then((s) =>
           console.log(
             `[cron digest] users=${s.usersChecked} sent=${s.sent} skipped=${s.skipped} errors=${s.errors}`

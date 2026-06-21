@@ -62,6 +62,35 @@ export interface UpdateSettingsRequest {
   digestWeekday?: number;
   /** 残り日数の閾値 */
   thresholdDays?: number;
+  notifyEmailEnabled?: boolean;
+  notifyLineEnabled?: boolean;
+  notifyAlexaEnabled?: boolean;
+}
+
+/** GET /auth/me と PATCH /auth/me のレスポンス */
+export interface UserInfoResponse {
+  id: string;
+  email: string;
+  name: string | null;
+  extensionToken: string;
+  notifyEmail: string;
+  digestWeekday: number;
+  thresholdDays: number;
+  notifyEmailEnabled: boolean;
+  notifyLineEnabled: boolean;
+  notifyAlexaEnabled: boolean;
+  /** LINE bot と紐付け済みか */
+  lineLinked: boolean;
+  /** Alexa スキルと紐付け済みか */
+  alexaLinked: boolean;
+}
+
+/** POST /api/line/link-code および /api/alexa/link-code のレスポンス */
+export interface LinkCodeResponse {
+  /** 6 桁の数値コード */
+  code: string;
+  /** 有効期限 unix ms */
+  expiresAt: number;
 }
 
 /** JustWatch 候補（マッチ確認UIで提示する1件） */
