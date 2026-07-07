@@ -36,10 +36,17 @@
   box-sizing: border-box;
 }
 
+/* 横スクロール（ナビ右に出る余白）を防ぐ。clip は hidden と違い
+ * overflow-y を auto にせず、sticky ヘッダーを壊さない。 */
+html {
+  overflow-x: clip;
+}
+
 body {
   margin: 0;
   min-height: 100vh;
   background: var(--bg);
+  overflow-x: clip;
 }
 
 button {
@@ -120,6 +127,10 @@ a:hover {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  /* flex 縦積みの子（特にティッカー）が内容幅をリークして
+   * ページ全体を広げないよう、シェル自身の伸長を抑える。 */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .wrap {
@@ -475,6 +486,10 @@ a:hover {
   border-bottom: 1px solid var(--border);
   font-variant-numeric: tabular-nums;
   overflow-x: auto;
+  /* iOS Safari 対策: スクロールコンテナの min-width:auto が
+   * 内容幅（セル合計）としてリークし、親を広げるのを防ぐ。 */
+  min-width: 0;
+  max-width: 100%;
 }
 
 .ticker__cell {
