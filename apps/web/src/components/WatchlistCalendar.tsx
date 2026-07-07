@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import type { WatchlistEntry } from '@netflix-deadline/shared';
-
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+import { formatJaDate, WEEKDAYS_JA } from '../lib/date';
+import { SERVICE_NAME } from '../lib/services';
 
 export function WatchlistCalendar({ items }: { items: WatchlistEntry[] }) {
   const now = new Date();
@@ -29,6 +29,13 @@ export function WatchlistCalendar({ items }: { items: WatchlistEntry[] }) {
   const dateKey = (d: number) =>
     `${view.y}-${String(view.m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 
+  const monthCount = useMemo(() => {
+    let n = 0;
+    for (let d = 1; d <= daysInMonth; d++) n += byDate.get(dateKey(d))?.length ?? 0;
+    return n;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [byDate, view.y, view.m, daysInMonth]);
+
   const prev = () =>
     setView(({ y, m }) => (m === 0 ? { y: y - 1, m: 11 } : { y, m: m - 1 }));
   const next = () =>
@@ -41,29 +48,33 @@ export function WatchlistCalendar({ items }: { items: WatchlistEntry[] }) {
       : -1;
 
   return (
-    <div className="calendar">
-      <div className="cal-nav">
-        <button onClick={prev} aria-label="前の月">
-          ‹
-        </button>
-        <div className="cal-nav-center">
-          <span>
-            {view.y} 年 {view.m + 1} 月
-          </span>{' '}
-          <button
-            className="btn-ghost"
-            onClick={today}
-            style={{ marginLeft: 8, fontSize: 11, padding: '2px 8px' }}
-          >
+    <>
+      <div className="cal-head">
+        <div className="cal-head__left">
+          <div className="cal-month">
+            {view.y}.{String(view.m + 1).padStart(2, '0')}
+          </div>
+          <div className="cal-summary">
+            {monthCount > 0
+              ? `この月に ${monthCount} 作品が配信終了`
+              : 'この月の配信終了はありません'}
+          </div>
+        </div>
+        <div className="cal-nav">
+          <button className="cal-nav__arrow" onClick={prev} aria-label="前の月">
+            ‹
+          </button>
+          <button className="cal-nav__today" onClick={today}>
             今月
           </button>
+          <button className="cal-nav__arrow" onClick={next} aria-label="次の月">
+            ›
+          </button>
         </div>
-        <button onClick={next} aria-label="次の月">
-          ›
-        </button>
       </div>
+
       <div className="cal-grid">
-        {WEEKDAYS.map((w, idx) => (
+        {WEEKDAYS_JA.map((w, idx) => (
           <div
             key={w}
             className={`cal-wd${idx === 0 ? ' sun' : ''}${idx === 6 ? ' sat' : ''}`}
@@ -74,8 +85,8 @@ export function WatchlistCalendar({ items }: { items: WatchlistEntry[] }) {
         {cells.map((d, idx) => (
           <div
             key={idx}
-            className={`cal-cell${d === todayKey ? ' today' : ''}${
-              d ? '' : ' empty'
+            className={`cal-cell${d === todayKey ? ' is-today' : ''}${
+              d ? '' : ' is-empty'
             }`}
           >
             {d && <div className="cal-day">{d}</div>}
@@ -83,8 +94,10 @@ export function WatchlistCalendar({ items }: { items: WatchlistEntry[] }) {
               (byDate.get(dateKey(d)) ?? []).map((i) => (
                 <div
                   key={i.id}
-                  className={`cal-item ${i.service}`}
-                  title={`${i.title}（${i.service}）`}
+                  className={`cal-chip ${i.service}`}
+                  title={`${i.title}（${SERVICE_NAME[i.service]}）· ${formatJaDate(
+                    i.expiresAt!
+                  )}まで`}
                 >
                   {i.title}
                 </div>
@@ -92,6 +105,17 @@ export function WatchlistCalendar({ items }: { items: WatchlistEntry[] }) {
           </div>
         ))}
       </div>
-    </div>
+
+      <div className="cal-legend">
+        <span>
+          <i className="netflix" />
+          Netflix
+        </span>
+        <span>
+          <i className="prime" />
+          Prime Video
+        </span>
+      </div>
+    </>
   );
 }

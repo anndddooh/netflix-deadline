@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 64 64">
+  <defs><clipPath id="r"><rect x="2" y="2" width="60" height="60" rx="14"></rect></clipPath></defs>
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#e8503f"></rect>
+  <g clip-path="url(#r)">
+    <rect x="2" y="2" width="60" height="17" fill="#000000" opacity="0.3"></rect>
+    <path d="M62 44 L62 62 L44 62 Z" fill="#111013"></path>
+  </g>
+  <image x="21.91" y="28.50" width="20.17" height="24"></image>
+</svg>

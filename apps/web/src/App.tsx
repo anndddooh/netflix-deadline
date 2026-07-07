@@ -5,20 +5,20 @@ import { WatchlistList } from './components/WatchlistList';
 import { WatchlistCalendar } from './components/WatchlistCalendar';
 import { SettingsPanel } from './components/SettingsPanel';
 import { MatchReview } from './components/MatchReview';
-import { daysUntil } from './lib/date';
-import { MYLIST_URLS } from './lib/services';
+import { Logo } from './components/Logo';
 
 type Tab = 'list' | 'calendar' | 'review' | 'settings';
+
 type AuthState =
   | { kind: 'loading' }
   | { kind: 'guest' }
   | { kind: 'user'; user: UserInfo };
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'list', label: '一覧' },
-  { id: 'calendar', label: 'カレンダー' },
-  { id: 'review', label: 'マッチ確認' },
-  { id: 'settings', label: '設定' },
+const TABS: { id: Tab; label: string; icon: string }[] = [
+  { id: 'list', label: '見納め間近', icon: '▶' },
+  { id: 'calendar', label: 'カレンダー', icon: '▦' },
+  { id: 'review', label: 'マッチ確認', icon: '⇄' },
+  { id: 'settings', label: '設定', icon: '⚙' },
 ];
 
 export function App() {
@@ -49,169 +49,164 @@ export function App() {
     void loadWatchlist();
   }, [auth.kind, loadWatchlist]);
 
-  const summary = useMemo(() => {
-    if (!items) return null;
-    const withExpiry = items.filter((i) => i.expiresAt);
-    const urgent = withExpiry.filter((i) => daysUntil(i.expiresAt!) <= 7).length;
-    const soon = withExpiry.filter((i) => {
-      const d = daysUntil(i.expiresAt!);
-      return d > 7 && d <= 14;
-    }).length;
-    const unmatched = items.filter((i) => i.matchStatus === 'unmatched').length;
-    return { total: items.length, withExpiry: withExpiry.length, urgent, soon, unmatched };
-  }, [items]);
+  const unmatchedCount = useMemo(
+    () => (items ? items.filter((i) => i.matchStatus === 'unmatched').length : 0),
+    [items]
+  );
 
   if (auth.kind === 'loading') {
     return (
-      <main className="app">
+      <div className="landing">
+        <div className="landing__glow" />
         <div className="loading">読み込み中…</div>
-      </main>
+      </div>
     );
   }
 
   if (auth.kind === 'guest') {
-    return (
-      <main className="app landing">
-        <div className="landing-card">
-          <div className="brand">
-            <span className="brand-dot brand-dot-1" />
-            <span className="brand-dot brand-dot-2" />
-            <h1 className="brand-title">netflix-deadline</h1>
-          </div>
-          <p className="lead">
-            Netflix / Prime Video のマイリスト作品のうち、
-            <br />
-            <strong>配信終了が近いもの</strong>を見逃さないためのツール。
-          </p>
-          <ul className="features">
-            <li>一覧・カレンダーで終了予定を可視化</li>
-            <li>週1回のメールダイジェスト</li>
-            <li>Chrome 拡張でマイリストを自動取り込み</li>
-          </ul>
-          <a className="btn-primary btn-lg" href="/auth/google/start">
-            Google でログイン
-          </a>
-        </div>
-      </main>
-    );
+    return <Landing />;
   }
 
   const user = auth.user;
+  const initial = (user.name || user.email || '?').trim().charAt(0).toUpperCase();
+
+  const onLogout = async () => {
+    await logout();
+    setAuth({ kind: 'guest' });
+    setItems(null);
+  };
 
   return (
     <div className="shell">
-      <header className="topbar">
-        <div className="topbar-inner">
-          <div className="brand brand-sm">
-            <span className="brand-dot brand-dot-1" />
-            <span className="brand-dot brand-dot-2" />
-            <h1 className="brand-title">netflix-deadline</h1>
+      <header className="header">
+        <div className="header__inner">
+          <div className="brand">
+            <Logo size={36} />
+            <div>
+              <div className="brand__wordmark">MIOSAME</div>
+              <div className="brand__subtitle">見納め — 配信終了カレンダー</div>
+            </div>
           </div>
-          <div className="user-info">
-            <span className="user-email">{user.email}</span>
+          <div className="header__right">
+            <nav className="topnav">
+              {TABS.map((t) => (
+                <button
+                  key={t.id}
+                  className={`topnav__tab${tab === t.id ? ' is-active' : ''}`}
+                  onClick={() => setTab(t.id)}
+                >
+                  {t.label}
+                  {t.id === 'review' && unmatchedCount > 0 && (
+                    <span className="tab-badge">{unmatchedCount}</span>
+                  )}
+                </button>
+              ))}
+            </nav>
             <button
-              className="btn-ghost"
-              onClick={async () => {
-                await logout();
-                setAuth({ kind: 'guest' });
-                setItems(null);
-              }}
+              className="avatar"
+              onClick={onLogout}
+              title={`ログアウト（${user.email}）`}
             >
-              ログアウト
+              {initial}
             </button>
           </div>
         </div>
-        <nav className="tabs" role="tablist">
-          <div className="tabs-inner">
-            {TABS.map((t) => (
-              <button
-                key={t.id}
-                role="tab"
-                aria-selected={tab === t.id}
-                className={`tab${tab === t.id ? ' active' : ''}`}
-                onClick={() => setTab(t.id)}
-              >
-                {t.label}
-                {t.id === 'review' && summary && summary.unmatched > 0 && (
-                  <span className="tab-badge">{summary.unmatched}</span>
-                )}
-              </button>
-            ))}
-          </div>
-        </nav>
       </header>
 
-      <main className="app">
-        {(tab === 'list' || tab === 'calendar') && (
-          <div className="mylist-bar">
-            <span className="mylist-bar-label">マイリストを編集</span>
-            <a
-              className="mylist-link netflix"
-              href={MYLIST_URLS.netflix}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <span className="badge netflix">Netflix</span>
-              <span>マイリストを開く</span>
-              <span className="ext-arrow">↗</span>
-            </a>
-            <a
-              className="mylist-link prime"
-              href={MYLIST_URLS.prime}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <span className="badge prime">Prime</span>
-              <span>ウォッチリストを開く</span>
-              <span className="ext-arrow">↗</span>
-            </a>
-            <span className="mylist-bar-hint muted">
-              編集後、拡張機能の「同期」を押すと反映されます
-            </span>
-          </div>
-        )}
+      {error && (
+        <div className="wrap" style={{ paddingBottom: 0 }}>
+          <p className="msg-error">読み込みエラー: {error}</p>
+        </div>
+      )}
 
-        {summary && (tab === 'list' || tab === 'calendar') && (
-          <div className="summary">
-            <StatCard label="登録作品" value={summary.total} />
-            <StatCard label="終了予定あり" value={summary.withExpiry} />
-            <StatCard label="残り7日以内" value={summary.urgent} accent="urgent" />
-            <StatCard label="残り8〜14日" value={summary.soon} accent="soon" />
-          </div>
-        )}
+      {tab === 'list' &&
+        (items ? (
+          <WatchlistList items={items} />
+        ) : (
+          !error && <div className="loading">読み込み中…</div>
+        ))}
 
-        {error && <p className="msg-error">読み込みエラー: {error}</p>}
-        {!items && !error && <div className="loading">読み込み中…</div>}
+      {tab === 'calendar' &&
+        (items ? (
+          <main className="wrap">
+            <WatchlistCalendar items={items} />
+          </main>
+        ) : (
+          !error && <div className="loading">読み込み中…</div>
+        ))}
 
-        {items && tab === 'list' && <WatchlistList items={items} />}
-        {items && tab === 'calendar' && <WatchlistCalendar items={items} />}
-        {items && tab === 'review' && (
-          <MatchReview items={items} onChanged={loadWatchlist} />
-        )}
-        {tab === 'settings' && (
+      {tab === 'review' &&
+        (items ? (
+          <main className="wrap wrap--narrow">
+            <MatchReview items={items} onChanged={loadWatchlist} />
+          </main>
+        ) : (
+          !error && <div className="loading">読み込み中…</div>
+        ))}
+
+      {tab === 'settings' && (
+        <main className="wrap wrap--narrow">
           <SettingsPanel
             user={user}
             onUpdate={(u) => setAuth({ kind: 'user', user: u })}
           />
-        )}
-      </main>
+        </main>
+      )}
+
+      <nav className="bottombar">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            className={`bottombar__tab${tab === t.id ? ' is-active' : ''}`}
+            onClick={() => setTab(t.id)}
+          >
+            <span className="bottombar__icon">{t.icon}</span>
+            <span className="bottombar__label">
+              {t.label}
+              {t.id === 'review' && unmatchedCount > 0 && (
+                <span className="bottombar__badge">{unmatchedCount}</span>
+              )}
+            </span>
+          </button>
+        ))}
+      </nav>
     </div>
   );
 }
 
-function StatCard({
-  label,
-  value,
-  accent,
-}: {
-  label: string;
-  value: number;
-  accent?: 'urgent' | 'soon';
-}) {
+function Landing() {
   return (
-    <div className={`stat${accent ? ' stat-' + accent : ''}`}>
-      <div className="stat-value">{value}</div>
-      <div className="stat-label">{label}</div>
-    </div>
+    <main className="landing">
+      <div className="landing__glow" />
+      <div className="landing__inner">
+        <Logo size={88} hero />
+        <div className="wordmark wordmark--hero">MIOSAME</div>
+        <div className="subtitle subtitle--hero">見納め — 配信終了カレンダー</div>
+        <p className="landing__lead">
+          Netflix / Prime Video のマイリストから、
+          <br />
+          <strong>もうすぐ消える作品</strong>だけを教えてくれる。
+          <br />
+          一覧・カレンダー・週次ダイジェストで、見逃しをゼロに。
+        </p>
+        <a className="landing__cta btn-cream" href="/auth/google/start">
+          Google でログイン
+        </a>
+        <div className="landing__features">
+          <span>
+            <i />
+            一覧・カレンダー表示
+          </span>
+          <span>
+            <i />
+            週次メールダイジェスト
+          </span>
+          <span>
+            <i />
+            Chrome 拡張で自動同期
+          </span>
+        </div>
+      </div>
+    </main>
   );
 }

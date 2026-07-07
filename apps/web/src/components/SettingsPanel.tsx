@@ -7,11 +7,12 @@ import {
   updateSettings,
   type UserInfo,
 } from '../api';
-import { MYLIST_URLS } from '../lib/services';
+import { WEEKDAYS_JA } from '../lib/date';
 
-const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
-const LINE_BOT_BASIC_ID: string | undefined = (import.meta as any).env?.VITE_LINE_BOT_BASIC_ID;
-const ALEXA_SKILL_NAME: string | undefined = (import.meta as any).env?.VITE_ALEXA_SKILL_NAME;
+const LINE_BOT_BASIC_ID: string | undefined = (import.meta as any).env
+  ?.VITE_LINE_BOT_BASIC_ID;
+const ALEXA_SKILL_NAME: string | undefined = (import.meta as any).env
+  ?.VITE_ALEXA_SKILL_NAME;
 
 interface Props {
   user: UserInfo;
@@ -23,7 +24,9 @@ export function SettingsPanel({ user, onUpdate }: Props) {
   const [digestWeekday, setDigestWeekday] = useState(user.digestWeekday);
   const [thresholdDays, setThresholdDays] = useState(user.thresholdDays);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
+  const [message, setMessage] = useState<{ kind: 'ok' | 'error'; text: string } | null>(
+    null
+  );
   const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
 
   const dirty =
@@ -68,209 +71,187 @@ export function SettingsPanel({ user, onUpdate }: Props) {
   };
 
   return (
-    <div className="settings">
-      <section className="card">
-        <h2 className="card-title">通知設定</h2>
-        <p className="card-desc">
+    <>
+      <h1 className="page-title" style={{ marginBottom: 28 }}>
+        SETTINGS
+      </h1>
+
+      {/* WEEKLY DIGEST */}
+      <section className="settings-card">
+        <h2 className="card-h">WEEKLY DIGEST — 週次ダイジェスト</h2>
+        <p className="card-p">
           毎週の指定曜日に、配信終了が近い作品をまとめて通知します。
         </p>
-
-        <div className="form-row">
-          <label htmlFor="notify-email">通知先メールアドレス</label>
-          <input
-            id="notify-email"
-            type="email"
-            value={notifyEmail}
-            onChange={(e) => setNotifyEmail(e.target.value)}
-            placeholder="you@example.com"
-          />
-        </div>
-
-        <div className="form-row">
-          <label htmlFor="weekday">送信曜日</label>
-          <div className="weekday-picker">
-            {WEEKDAYS.map((label, idx) => (
-              <button
-                type="button"
-                key={idx}
-                className={`weekday-btn${digestWeekday === idx ? ' active' : ''}`}
-                onClick={() => setDigestWeekday(idx)}
-                aria-pressed={digestWeekday === idx}
-              >
-                {label}
-              </button>
-            ))}
+        <div className="digest-fields">
+          <div className="field">
+            <label className="field__label">送信曜日</label>
+            <div className="weekday-seg">
+              {WEEKDAYS_JA.map((label, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  className={`weekday-btn${digestWeekday === idx ? ' is-active' : ''}`}
+                  onClick={() => setDigestWeekday(idx)}
+                  aria-pressed={digestWeekday === idx}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-
-        <div className="form-row">
-          <label htmlFor="threshold">通知対象 残り日数</label>
-          <div className="threshold-input">
+          <div className="field">
+            <label className="field__label">通知対象 残り日数</label>
+            <div className="threshold">
+              <input
+                type="number"
+                min={1}
+                max={365}
+                value={thresholdDays}
+                onChange={(e) => setThresholdDays(Number(e.target.value) || 0)}
+              />
+              <span>日以内</span>
+            </div>
+          </div>
+          <div className="field">
+            <label className="field__label">通知先メールアドレス</label>
             <input
-              id="threshold"
-              type="number"
-              min={1}
-              max={365}
-              value={thresholdDays}
-              onChange={(e) => setThresholdDays(Number(e.target.value) || 0)}
+              type="email"
+              value={notifyEmail}
+              onChange={(e) => setNotifyEmail(e.target.value)}
+              placeholder="you@example.com"
             />
-            <span className="muted">日以内</span>
           </div>
         </div>
-
-        <div className="form-actions">
-          <button className="btn-primary" onClick={save} disabled={!dirty || saving}>
-            {saving ? '保存中…' : '保存'}
-          </button>
-          {message && (
-            <span className={message.kind === 'ok' ? 'msg-ok' : 'msg-error'}>
-              {message.text}
-            </span>
-          )}
-        </div>
+        <button
+          className="btn-accent digest-save"
+          onClick={save}
+          disabled={!dirty || saving}
+        >
+          {saving ? '保存中…' : '保存'}
+        </button>
+        {message && (
+          <span className={`settings-msg ${message.kind}`}>{message.text}</span>
+        )}
       </section>
 
-      <section className="card">
-        <h2 className="card-title">通知チャンネル</h2>
-        <p className="card-desc">
-          ダイジェスト送信時にどのチャンネルへ流すかを選びます。
-          LINE / Alexa は連携が必要です。
+      {/* CHANNELS */}
+      <section className="settings-card">
+        <h2 className="card-h">CHANNELS — 通知チャンネル</h2>
+        <p className="card-p" style={{ marginBottom: 8 }}>
+          ダイジェストの送信先。LINE / Alexa は下の連携が必要です。
         </p>
 
         <div className="channel-row">
           <div className="channel-info">
-            <div className="channel-title">メール</div>
-            <div className="channel-desc muted">宛先: {user.notifyEmail}</div>
+            <div className="channel-name">メール</div>
+            <div className="channel-desc">宛先: {user.notifyEmail}</div>
           </div>
-          <ChannelToggle
-            checked={user.notifyEmailEnabled}
-            onChange={(v) => void toggleChannel('notifyEmailEnabled', v)}
+          <Toggle
+            on={user.notifyEmailEnabled}
+            onToggle={() => void toggleChannel('notifyEmailEnabled', !user.notifyEmailEnabled)}
           />
         </div>
 
         <div className="channel-row">
           <div className="channel-info">
-            <div className="channel-title">
+            <div className="channel-name">
               LINE
               {user.lineLinked ? (
-                <span className="badge-linked">連携済み</span>
+                <span className="chip-linked">連携済み</span>
               ) : (
-                <span className="badge-unlinked">未連携</span>
+                <span className="chip-unlinked">未連携</span>
               )}
             </div>
-            <div className="channel-desc muted">公式アカウントから通知を受け取ります</div>
+            <div className="channel-desc">公式アカウントから通知を受け取ります</div>
           </div>
-          <ChannelToggle
-            checked={user.notifyLineEnabled}
+          <Toggle
+            on={user.notifyLineEnabled}
             disabled={!user.lineLinked}
-            onChange={(v) => void toggleChannel('notifyLineEnabled', v)}
+            onToggle={() => void toggleChannel('notifyLineEnabled', !user.notifyLineEnabled)}
           />
         </div>
 
         <div className="channel-row">
           <div className="channel-info">
-            <div className="channel-title">
+            <div className="channel-name">
               Alexa
               {user.alexaLinked ? (
-                <span className="badge-linked">連携済み</span>
+                <span className="chip-linked">連携済み</span>
               ) : (
-                <span className="badge-unlinked">未連携</span>
+                <span className="chip-unlinked">未連携</span>
               )}
             </div>
-            <div className="channel-desc muted">Alexa デバイスの通知センターに届きます</div>
+            <div className="channel-desc">Alexa デバイスの通知センターに届きます</div>
           </div>
-          <ChannelToggle
-            checked={user.notifyAlexaEnabled}
+          <Toggle
+            on={user.notifyAlexaEnabled}
             disabled={!user.alexaLinked}
-            onChange={(v) => void toggleChannel('notifyAlexaEnabled', v)}
+            onToggle={() => void toggleChannel('notifyAlexaEnabled', !user.notifyAlexaEnabled)}
           />
         </div>
       </section>
 
-      <LineLinkSection user={user} onUpdate={onUpdate} />
+      {/* LINE / Alexa 連携 */}
+      <div className="link-grid">
+        <LineLinkSection user={user} onUpdate={onUpdate} />
+        <AlexaLinkSection user={user} onUpdate={onUpdate} />
+      </div>
 
-      <AlexaLinkSection user={user} onUpdate={onUpdate} />
-
-      <section className="card">
-        <h2 className="card-title">マイリストを開く</h2>
-        <p className="card-desc">
-          Netflix / Prime の自分のマイリストページを直接開けます。編集後、
-          拡張機能の「同期」を押すとこのアプリに反映されます。
-        </p>
-        <div className="mylist-bar" style={{ margin: 0, border: 'none', padding: 0, boxShadow: 'none' }}>
-          <a
-            className="mylist-link netflix"
-            href={MYLIST_URLS.netflix}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <span className="badge netflix">Netflix</span>
-            <span>マイリストを開く</span>
-            <span className="ext-arrow">↗</span>
-          </a>
-          <a
-            className="mylist-link prime"
-            href={MYLIST_URLS.prime}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <span className="badge prime">Prime</span>
-            <span>ウォッチリストを開く</span>
-            <span className="ext-arrow">↗</span>
-          </a>
-        </div>
-      </section>
-
-      <section className="card">
-        <h2 className="card-title">拡張機能の接続</h2>
-        <p className="card-desc">
+      {/* EXTENSION */}
+      <section className="settings-card">
+        <h2 className="card-h">EXTENSION — 拡張機能の接続</h2>
+        <p className="card-p" style={{ marginBottom: 16 }}>
           Chrome 拡張機能のポップアップに、下の2つの値を貼り付けてください。
         </p>
-        <div className="kv-row">
-          <span className="kv-label">API URL</span>
-          <code className="kv-value">{window.location.origin}</code>
+        <div className="ext-row">
+          <span className="ext-label">API URL</span>
+          <code className="ext-code">{window.location.origin}</code>
           <button
-            className="btn-ghost"
+            className="btn-ghost ext-copy"
             onClick={() => copy('API URL', window.location.origin)}
           >
             コピー
           </button>
         </div>
-        <div className="kv-row">
-          <span className="kv-label">ペアリングトークン</span>
-          <code className="kv-value">{user.extensionToken}</code>
+        <div className="ext-row">
+          <span className="ext-label">ペアリングトークン</span>
+          <code className="ext-code">{user.extensionToken}</code>
           <button
-            className="btn-ghost"
+            className="btn-ghost ext-copy"
             onClick={() => copy('ペアリングトークン', user.extensionToken)}
           >
             コピー
           </button>
         </div>
-        {copiedLabel && <p className="msg-ok">「{copiedLabel}」をコピーしました</p>}
+        {copiedLabel && (
+          <p className="settings-msg ok" style={{ marginLeft: 0, marginTop: 10 }}>
+            「{copiedLabel}」をコピーしました
+          </p>
+        )}
       </section>
-    </div>
+    </>
   );
 }
 
-function ChannelToggle({
-  checked,
-  onChange,
+function Toggle({
+  on,
   disabled,
+  onToggle,
 }: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
+  on: boolean;
   disabled?: boolean;
+  onToggle: () => void;
 }) {
   return (
-    <label className={`channel-toggle${disabled ? ' disabled' : ''}`}>
-      <input
-        type="checkbox"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-      <span className="channel-toggle-track" />
-    </label>
+    <button
+      type="button"
+      className={`toggle${on ? ' is-on' : ''}${disabled ? ' is-disabled' : ''}`}
+      onClick={() => !disabled && onToggle()}
+      disabled={disabled}
+      aria-pressed={on}
+    >
+      <span className="toggle__knob" />
+    </button>
   );
 }
 
@@ -311,55 +292,50 @@ function LineLinkSection({ user, onUpdate }: Props) {
   };
 
   return (
-    <section className="card">
-      <h2 className="card-title">LINE 連携</h2>
+    <section className="settings-card" style={{ marginBottom: 0 }}>
+      <div className="link-head">
+        <h2 className="card-h">LINE 連携</h2>
+        {user.lineLinked && <span className="chip-linked">連携済み</span>}
+      </div>
       {user.lineLinked ? (
         <>
-          <p className="card-desc">
+          <p className="linked-desc">
             LINE と連携済みです。週次ダイジェストが LINE にも届きます。
           </p>
-          <button className="btn-ghost" onClick={unlink} disabled={busy}>
+          <button className="btn-ghost unlink-btn" onClick={unlink} disabled={busy}>
             {busy ? '解除中…' : '連携を解除'}
           </button>
         </>
       ) : (
         <>
-          <p className="card-desc">
-            手順:
-          </p>
-          <ol className="step-list">
+          <ol className="step-ol">
             <li>
-              下のボタンで <strong>6 桁の連携コード</strong> を発行する（10 分有効）
+              下のボタンで <strong>6桁の連携コード</strong> を発行（10分有効）
             </li>
             <li>
-              LINE で公式アカウント
+              公式アカウント
               {LINE_BOT_BASIC_ID ? (
                 <>
                   {' '}
                   <code>{LINE_BOT_BASIC_ID}</code>
                 </>
-              ) : (
-                ' （ID は管理者にご確認ください）'
-              )}
-              を友だち追加する
+              ) : null}
+              を友だち追加
             </li>
-            <li>トークでそのコードを送信する</li>
-            <li>「連携しました」と返ってきたら完了</li>
+            <li>トークでコードを送信 →「連携しました」で完了</li>
           </ol>
           {!code ? (
-            <button className="btn-primary" onClick={issue} disabled={busy}>
+            <button className="btn-cream issue-btn" onClick={issue} disabled={busy}>
               {busy ? '発行中…' : '連携コードを発行'}
             </button>
           ) : (
-            <div className="link-code-box">
-              <div className="link-code">{code}</div>
-              <div className="link-code-hint muted">
+            <div className="code-box">
+              <div className="code">{code}</div>
+              <div className="code-hint">
                 LINE のトークにこのコードを送ってください
-                {expiresAt && (
-                  <>（{new Date(expiresAt).toLocaleTimeString()} まで有効）</>
-                )}
+                {expiresAt && <>（{new Date(expiresAt).toLocaleTimeString()} まで有効）</>}
               </div>
-              <button className="btn-ghost" onClick={issue} disabled={busy}>
+              <button className="btn-ghost reissue-btn" onClick={issue} disabled={busy}>
                 再発行
               </button>
             </div>
@@ -409,43 +385,44 @@ function AlexaLinkSection({ user, onUpdate }: Props) {
 
   const skillPhrase = ALEXA_SKILL_NAME
     ? `「アレクサ、${ALEXA_SKILL_NAME}を開いて」`
-    : '「アレクサ、Netflix デッドラインを開いて」';
+    : '「アレクサ、ミオサメを開いて」';
 
   return (
-    <section className="card">
-      <h2 className="card-title">Alexa 連携</h2>
+    <section className="settings-card" style={{ marginBottom: 0 }}>
+      <div className="link-head">
+        <h2 className="card-h">ALEXA 連携</h2>
+        {user.alexaLinked && <span className="chip-linked">連携済み</span>}
+      </div>
       {user.alexaLinked ? (
         <>
-          <p className="card-desc">
-            Alexa と連携済みです。Alexa デバイスの通知センターにダイジェストが届きます。
+          <p className="linked-desc">
+            Alexa デバイスと連携済みです。ダイジェストは通知センターに届きます。
           </p>
-          <button className="btn-ghost" onClick={unlink} disabled={busy}>
+          <button className="btn-ghost unlink-btn" onClick={unlink} disabled={busy}>
             {busy ? '解除中…' : '連携を解除'}
           </button>
         </>
       ) : (
         <>
-          <p className="card-desc">手順:</p>
-          <ol className="step-list">
-            <li>下のボタンで <strong>6 桁の連携コード</strong> を発行する（10 分有効）</li>
-            <li>Alexa デバイスに {skillPhrase} と話しかける</li>
-            <li>スキルが「コードを言ってください」と応答するので、コードを発話</li>
-            <li>「連携しました」と返ってきたら完了</li>
+          <ol className="step-ol">
+            <li>
+              下のボタンで <strong>6桁の連携コード</strong> を発行（10分有効）
+            </li>
+            <li>{skillPhrase} と話しかける</li>
+            <li>スキルにコードを発話 →「連携しました」で完了</li>
           </ol>
           {!code ? (
-            <button className="btn-primary" onClick={issue} disabled={busy}>
+            <button className="btn-cream issue-btn" onClick={issue} disabled={busy}>
               {busy ? '発行中…' : '連携コードを発行'}
             </button>
           ) : (
-            <div className="link-code-box">
-              <div className="link-code">{code}</div>
-              <div className="link-code-hint muted">
+            <div className="code-box">
+              <div className="code">{code}</div>
+              <div className="code-hint">
                 Alexa にこのコードを発話してください
-                {expiresAt && (
-                  <>（{new Date(expiresAt).toLocaleTimeString()} まで有効）</>
-                )}
+                {expiresAt && <>（{new Date(expiresAt).toLocaleTimeString()} まで有効）</>}
               </div>
-              <button className="btn-ghost" onClick={issue} disabled={busy}>
+              <button className="btn-ghost reissue-btn" onClick={issue} disabled={busy}>
                 再発行
               </button>
             </div>
