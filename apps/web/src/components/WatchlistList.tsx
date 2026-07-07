@@ -143,12 +143,12 @@ export function WatchlistList({ items }: { items: WatchlistEntry[] }) {
                       ? '保留中'
                       : '';
                 return (
-                  <span key={i.id} className="pill">
+                  <span key={i.id} className="pill" title={i.title}>
                     <span
                       className="pill__dot"
                       style={{ background: SERVICE_COLOR[i.service] }}
                     />
-                    {i.title}
+                    <span className="pill__title">{i.title}</span>
                     {meta && <span className="pill__meta">{meta}</span>}
                   </span>
                 );
