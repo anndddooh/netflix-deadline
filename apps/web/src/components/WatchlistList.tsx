@@ -1,6 +1,12 @@
 import { useMemo } from 'react';
 import type { WatchlistEntry } from '@netflix-deadline/shared';
-import { daysUntil, formatJaDate, tickerDate, WEEKDAYS_JA } from '../lib/date';
+import {
+  daysUntil,
+  formatJaDate,
+  tickerDate,
+  weekdayIndex,
+  WEEKDAYS_JA,
+} from '../lib/date';
 import {
   MYLIST_URLS,
   SERVICE_COLOR,
@@ -30,24 +36,31 @@ export function WatchlistList({ items }: { items: WatchlistEntry[] }) {
   const later = expiring.filter((i) => daysUntil(i.expiresAt!) > 14);
 
   // 日付ティッカー（終了日が近い順に最大6件）
-  const ticker = expiring.slice(0, 6).map((i) => {
-    const days = daysUntil(i.expiresAt!);
-    const isToday = days === 0;
-    const count = expiring.filter((x) => x.expiresAt === i.expiresAt).length;
-    return {
-      id: i.id,
+  // 日付ティッカー（終了日を近い順に最大6日付。同日複数作品は1セルにまとめ、
+  // 下段に「N作品」を表示する）
+  const ticker: { key: string; isToday: boolean; date: string; sub: string }[] = [];
+  const seenDates = new Set<string>();
+  for (const i of expiring) {
+    const key = i.expiresAt!;
+    if (seenDates.has(key)) continue;
+    seenDates.add(key);
+    const isToday = daysUntil(key) === 0;
+    const count = expiring.filter((x) => x.expiresAt === key).length;
+    ticker.push({
+      key,
       isToday,
-      date: tickerDate(i.expiresAt!),
-      sub: `${isToday ? '今夜' : WEEKDAYS_JA[new Date(i.expiresAt! + 'T00:00:00').getDay()]} · ${count}作品${isToday ? '終了' : ''}`,
-    };
-  });
+      date: tickerDate(key),
+      sub: `${isToday ? '今夜' : WEEKDAYS_JA[weekdayIndex(key)]} · ${count}作品${isToday ? '終了' : ''}`,
+    });
+    if (ticker.length >= 6) break;
+  }
 
   return (
     <>
       <div className="ticker">
         {ticker.map((tk) => (
           <div
-            key={tk.id}
+            key={tk.key}
             className={`ticker__cell${tk.isToday ? ' is-today' : ''}`}
           >
             <div className="ticker__date">{tk.date}</div>
