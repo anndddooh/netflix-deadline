@@ -20,8 +20,9 @@ import {
  */
 export function WatchlistList({ items }: { items: WatchlistEntry[] }) {
   const { expiring, noExpiry } = useMemo(() => {
+    // 配信終了日が過ぎた作品は「見納め間近」からは除外する（既に見られない）。
     const withExpiry = items
-      .filter((i) => i.expiresAt)
+      .filter((i) => i.expiresAt && daysUntil(i.expiresAt) >= 0)
       .sort((a, b) => a.expiresAt!.localeCompare(b.expiresAt!));
     return {
       expiring: withExpiry,

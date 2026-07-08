@@ -1740,6 +1740,19 @@ a:hover {
     grid-template-columns: 1fr;
   }
 
+  /* カレンダー見出し: 月＋概要を1行、月送りを次の行に縦積み。
+   * 横並びだと概要テキストが細い列に押し込まれて何行にも折れてしまう。 */
+  .cal-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .cal-month {
+    font-size: 36px;
+  }
+
   .cal-cell {
     min-height: 58px;
     border-radius: 6px;
