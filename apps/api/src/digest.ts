@@ -54,7 +54,7 @@ export function buildDigest(
   });
 
   const intro = `今後 ${user.thresholdDays} 日以内に配信終了予定の作品が ${items.length} 件あります。\n`;
-  const text = `${intro}\n${lines.join('\n')}\n\nnetflix-deadline からの週次ダイジェスト`;
+  const text = `${intro}\n${lines.join('\n')}\n\nMIOSAME（見納め）の週次ダイジェスト`;
 
   const liItems = items.map((i) => {
     const d = daysUntil(now, i.expiresAt!);
@@ -67,10 +67,10 @@ export function buildDigest(
   const html =
     `<p>${escapeHtml(intro)}</p>` +
     `<ul style="list-style:none;padding:0;">${liItems.join('')}</ul>` +
-    `<p style="color:#888;font-size:12px;">netflix-deadline からの週次ダイジェスト</p>`;
+    `<p style="color:#888;font-size:12px;">MIOSAME（見納め）の週次ダイジェスト</p>`;
 
   return {
-    subject: `[netflix-deadline] 配信終了が近い作品 ${items.length} 件`,
+    subject: `[MIOSAME] 配信終了が近い作品 ${items.length} 件`,
     text,
     html,
     count: items.length,

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "netflix-deadline 同期",
+  "name": "MIOSAME 同期",
   "version": "0.1.0",
-  "description": "Netflix / Prime のマイリストを netflix-deadline に同期する",
+  "description": "Netflix / Prime のマイリストを MIOSAME（見納め）に同期する",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": [
     "https://www.netflix.com/*",

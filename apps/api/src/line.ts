@@ -143,7 +143,7 @@ export async function handleWebhook(
         await replyText(
           cfg,
           ev.replyToken,
-          'netflix-deadline へようこそ。\n' +
+          'MIOSAME（見納め）へようこそ。\n' +
             'Web の設定画面で発行した 6 桁のコードを、そのままトークに送ってください。'
         );
       } else if (

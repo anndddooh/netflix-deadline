@@ -41,7 +41,7 @@
   //   ALEXA_API_BASE=https://api.amazonalexa.com/v1/proactiveEvents/stages/development
   // を vars に追加する。
   "vars": {
-    "EMAIL_FROM": "onboarding@resend.dev",
+    "EMAIL_FROM": "MIOSAME <onboarding@resend.dev>",
     "GOOGLE_CLIENT_ID": "209442782190-8h8celjv7np71i60vsutcbe58kh3aon7.apps.googleusercontent.com",
     "OAUTH_REDIRECT_URI": "https://netflix-deadline-api.annndddddooooooo.workers.dev/auth/google/callback",
     "WEB_BASE": "https://netflix-deadline-api.annndddddooooooo.workers.dev/"

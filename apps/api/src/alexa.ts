@@ -7,7 +7,7 @@
 //
 // 連携フロー（メールや LINE と同じく「6 桁コードで紐付け」式）:
 //   1. Web 設定画面で「Alexa 連携」ボタン → /api/alexa/link-code でコード発行
-//   2. ユーザーが Alexa で「アレクサ、Netflix デッドラインを開いて」
+//   2. ユーザーが Alexa で「アレクサ、ミオサメを開いて」
 //   3. スキルが「コードを言ってください」と返す
 //   4. ユーザーが「123456」と発話
 //   5. スキルのバックエンドが POST /api/alexa/link で
@@ -125,7 +125,7 @@ export async function sendProactiveEvent(
       payload: {
         state: { status: 'UNREAD', freshness: 'NEW' },
         messageGroup: {
-          creator: { name: 'netflix-deadline' },
+          creator: { name: 'MIOSAME' },
           count: 1,
         },
       },
