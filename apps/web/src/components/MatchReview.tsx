@@ -184,16 +184,16 @@ function ReviewRow({
         <span className={`badge ${item.service}`}>
           {SERVICE_LABEL[item.service]}
         </span>
-        <span className="review-row__title" title={item.title}>
-          {item.title}
-        </span>
-        {isUnmatched ? (
-          <span className="review-row__flag">未マッチ</span>
-        ) : (
-          <span className="review-row__auto">
-            {item.jwTitle ? `自動: ${item.jwTitle}` : '自動マッチ済'}
-          </span>
-        )}
+        <div className="review-row__body">
+          <div className="review-row__title">{item.title}</div>
+          {isUnmatched ? (
+            <div className="review-row__sub review-row__sub--flag">未マッチ</div>
+          ) : (
+            <div className="review-row__sub">
+              {item.jwTitle ? `自動: ${item.jwTitle}` : '自動マッチ済'}
+            </div>
+          )}
+        </div>
         <button className="btn-ghost review-row__toggle" onClick={handleToggle}>
           {toggleLabel}
         </button>
