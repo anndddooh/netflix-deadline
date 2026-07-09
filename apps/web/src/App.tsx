@@ -6,6 +6,7 @@ import { WatchlistCalendar } from './components/WatchlistCalendar';
 import { SettingsPanel } from './components/SettingsPanel';
 import { MatchReview } from './components/MatchReview';
 import { Logo } from './components/Logo';
+import { TabIcon } from './components/NavIcons';
 
 type Tab = 'list' | 'calendar' | 'review' | 'settings';
 
@@ -14,11 +15,11 @@ type AuthState =
   | { kind: 'guest' }
   | { kind: 'user'; user: UserInfo };
 
-const TABS: { id: Tab; label: string; icon: string }[] = [
-  { id: 'list', label: '見納め間近', icon: '▶' },
-  { id: 'calendar', label: 'カレンダー', icon: '▦' },
-  { id: 'review', label: 'マッチ確認', icon: '⇄' },
-  { id: 'settings', label: '設定', icon: '⚙' },
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'list', label: '見納め間近' },
+  { id: 'calendar', label: 'カレンダー' },
+  { id: 'review', label: 'マッチ確認' },
+  { id: 'settings', label: '設定' },
 ];
 
 export function App() {
@@ -160,7 +161,7 @@ export function App() {
             className={`bottombar__tab${tab === t.id ? ' is-active' : ''}`}
             onClick={() => setTab(t.id)}
           >
-            <span className="bottombar__icon">{t.icon}</span>
+            <TabIcon tab={t.id} className="bottombar__icon" />
             <span className="bottombar__label">
               {t.label}
               {t.id === 'review' && unmatchedCount > 0 && (
