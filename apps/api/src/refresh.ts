@@ -56,6 +56,7 @@ export async function refreshStalest(
           .update(watchlistItems)
           .set({
             expiresAt: node ? extractExpiry(node, item.service) : item.expiresAt,
+            jwPoster: node?.content?.posterUrl ?? item.jwPoster,
             expiryCheckedAt: now,
           })
           .where(eq(watchlistItems.id, item.id));
@@ -68,6 +69,7 @@ export async function refreshStalest(
             jwObjectId: r.jwObjectId,
             jwTitle: r.jwTitle,
             jwPath: r.jwPath,
+            jwPoster: r.jwPoster,
             expiresAt: r.expiresAt,
             matchStatus: r.matchStatus,
             expiryCheckedAt: now,

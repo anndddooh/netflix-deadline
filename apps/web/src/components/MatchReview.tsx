@@ -7,6 +7,7 @@ import {
   runMatch,
 } from '../api';
 import { SERVICE_LABEL } from '../lib/services';
+import { hidePosterOnError, posterImageUrl } from '../lib/poster';
 
 interface Props {
   items: WatchlistEntry[];
@@ -235,7 +236,17 @@ function ReviewRow({
                 const url = c.jwPath ? `https://www.justwatch.com${c.jwPath}` : null;
                 return (
                   <li key={c.jwObjectId} className="cand">
-                    <div className="cand-thumb" />
+                    <div className="cand-thumb">
+                      {posterImageUrl(c.posterPath, 's166') && (
+                        <img
+                          className="thumb-img"
+                          src={posterImageUrl(c.posterPath, 's166')!}
+                          alt=""
+                          loading="lazy"
+                          onError={hidePosterOnError}
+                        />
+                      )}
+                    </div>
                     <div className="cand-main">
                       <span className="cand-title">{c.title}</span>
                       {c.originalReleaseYear && (

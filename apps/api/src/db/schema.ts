@@ -68,6 +68,8 @@ export const watchlistItems = sqliteTable(
     jwObjectId: text('jw_object_id'),
     jwTitle: text('jw_title'),
     jwPath: text('jw_path'),
+    /** ポスター画像テンプレパス（JustWatch content.posterUrl） */
+    jwPoster: text('jw_poster'),
     /** 配信終了日 'YYYY-MM-DD'。未判明なら null */
     expiresAt: text('expires_at'),
     matchStatus: text('match_status', {

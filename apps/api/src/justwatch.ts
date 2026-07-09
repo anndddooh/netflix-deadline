@@ -15,6 +15,7 @@ query Search($filter: TitleFilter!, $country: Country!, $language: Language!, $f
       content(country: $country, language: $language) {
         title
         originalReleaseYear
+        posterUrl
         ... on MovieOrShowOrSeasonContent { fullPath }
       }
       offers(country: $country, platform: WEB, filter: $offerFilter) {
@@ -43,6 +44,9 @@ export interface JwNode {
   content: {
     title: string | null;
     originalReleaseYear: number | null;
+    /** ポスター画像のテンプレパス（例 '/poster/123/{profile}/slug.{format}'）。
+     *  実URL = 'https://images.justwatch.com' + posterUrl の {profile}/{format} を置換。 */
+    posterUrl: string | null;
     fullPath: string | null;
   } | null;
   offers: JwOffer[] | null;

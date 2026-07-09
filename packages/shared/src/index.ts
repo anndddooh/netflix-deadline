@@ -45,6 +45,8 @@ export interface WatchlistEntry {
   entityType: string | null;
   /** JustWatch 側のタイトル（突き合わせ結果） */
   jwTitle: string | null;
+  /** ポスター画像テンプレパス（JustWatch content.posterUrl）。posterImageUrl() で実URL化。 */
+  posterPath: string | null;
   /** 配信終了日 'YYYY-MM-DD'。未判明なら null */
   expiresAt: string | null;
   matchStatus: MatchStatus;
@@ -100,6 +102,8 @@ export interface MatchCandidate {
   title: string;
   originalReleaseYear: number | null;
   jwPath: string | null;
+  /** ポスター画像テンプレパス（JustWatch content.posterUrl） */
+  posterPath: string | null;
   /** このサービスでの配信終了日 'YYYY-MM-DD'。無ければ null */
   expiresAt: string | null;
 }

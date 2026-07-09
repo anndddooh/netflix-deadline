@@ -13,6 +13,7 @@ import {
   SERVICE_LABEL,
   SERVICE_NAME,
 } from '../lib/services';
+import { hidePosterOnError, posterImageUrl } from '../lib/poster';
 
 /**
  * ホーム（見納め間近）。
@@ -93,7 +94,17 @@ export function WatchlistList({ items }: { items: WatchlistEntry[] }) {
                       {d}
                       <small> 日</small>
                     </div>
-                    <div className="close-thumb" />
+                    <div className="close-thumb">
+                      {posterImageUrl(i.posterPath, 's166') && (
+                        <img
+                          className="thumb-img"
+                          src={posterImageUrl(i.posterPath, 's166')!}
+                          alt=""
+                          loading="lazy"
+                          onError={hidePosterOnError}
+                        />
+                      )}
+                    </div>
                     <div className="close-info">
                       <div className="close-title">{i.title}</div>
                       <div className="close-meta">
@@ -212,6 +223,15 @@ function Feature({ item }: { item: WatchlistEntry }) {
       <div className="feature__kicker">{kicker}</div>
       <div className="poster">
         <span className="poster__ph">POSTER</span>
+        {posterImageUrl(item.posterPath, 's592') && (
+          <img
+            className="poster__img"
+            src={posterImageUrl(item.posterPath, 's592')!}
+            alt={item.title}
+            loading="lazy"
+            onError={hidePosterOnError}
+          />
+        )}
         <span className={`badge ${item.service} feature__badge`}>
           {SERVICE_LABEL[item.service]}
         </span>

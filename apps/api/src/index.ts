@@ -499,6 +499,7 @@ app.get('/api/watchlist', async (c) => {
     title: r.title,
     entityType: r.entityType,
     jwTitle: r.jwTitle,
+    posterPath: r.jwPoster,
     expiresAt: r.expiresAt,
     matchStatus: r.matchStatus,
   }));
@@ -643,6 +644,7 @@ app.post('/api/watchlist/match', async (c) => {
           jwObjectId: r.jwObjectId,
           jwTitle: r.jwTitle,
           jwPath: r.jwPath,
+          jwPoster: r.jwPoster,
           expiresAt: r.expiresAt,
           matchStatus: r.matchStatus,
           expiryCheckedAt: now,
@@ -703,6 +705,7 @@ app.get('/api/watchlist/items/:id/candidates', async (c) => {
     title: n.content?.title ?? '(タイトル不明)',
     originalReleaseYear: n.content?.originalReleaseYear ?? null,
     jwPath: n.content?.fullPath ?? null,
+    posterPath: n.content?.posterUrl ?? null,
     expiresAt: extractExpiry(n, item.service),
   }));
 
@@ -782,6 +785,7 @@ app.post('/api/watchlist/items/:id/unmatch', async (c) => {
       jwObjectId: null,
       jwTitle: null,
       jwPath: null,
+      jwPoster: null,
       expiresAt: null,
       matchStatus: 'unmatched',
       expiryCheckedAt: Date.now(),

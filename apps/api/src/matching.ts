@@ -33,6 +33,8 @@ export interface MatchResult {
   jwObjectId: string | null;
   jwTitle: string | null;
   jwPath: string | null;
+  /** ポスター画像テンプレパス（JustWatch content.posterUrl）。 */
+  jwPoster: string | null;
   /** 配信終了日 'YYYY-MM-DD'。未判明なら null */
   expiresAt: string | null;
   matchStatus: 'matched' | 'unmatched';
@@ -42,6 +44,7 @@ const UNMATCHED: MatchResult = {
   jwObjectId: null,
   jwTitle: null,
   jwPath: null,
+  jwPoster: null,
   expiresAt: null,
   matchStatus: 'unmatched',
 };
@@ -91,6 +94,7 @@ export function nodeToResult(node: JwNode, service: StreamingService): MatchResu
     jwObjectId: node.id,
     jwTitle: node.content?.title ?? null,
     jwPath: node.content?.fullPath ?? null,
+    jwPoster: node.content?.posterUrl ?? null,
     expiresAt: extractExpiry(node, service),
     matchStatus: 'matched',
   };
