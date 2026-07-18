@@ -44,7 +44,10 @@
     "EMAIL_FROM": "MIOSAME <onboarding@resend.dev>",
     "GOOGLE_CLIENT_ID": "209442782190-8h8celjv7np71i60vsutcbe58kh3aon7.apps.googleusercontent.com",
     "OAUTH_REDIRECT_URI": "https://netflix-deadline-api.annndddddooooooo.workers.dev/auth/google/callback",
-    "WEB_BASE": "https://netflix-deadline-api.annndddddooooooo.workers.dev/"
+    "WEB_BASE": "https://netflix-deadline-api.annndddddooooooo.workers.dev/",
+    // Alexa スキルが未公開のため開発ステージへ送る。公開後は本番エンドポイント
+    // (https://api.amazonalexa.com/v1/proactiveEvents) に変更、または本行を削除する。
+    "ALEXA_API_BASE": "https://api.amazonalexa.com/v1/proactiveEvents/stages/development"
   },
 
   // cron スケジュール:
