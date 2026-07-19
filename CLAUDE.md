@@ -17,3 +17,14 @@
 - **モバイル CSS の罠**: グリッドは `1fr` でなく `minmax(0,1fr)`（日本語長タイトルの min-content 汚染防止）。スクロールコンテナには `min-width: 0`、`html/body` に `overflow-x: clip`（iOS Safari の flex column width leak 対策）。
 - **定数・ユーティリティの置き場**: サービス名/色 = `apps/web/src/lib/services.ts`、日付 = `apps/web/src/lib/date.ts`。App.tsx と SettingsPanel.tsx の共有定数は循環参照回避のため lib/ に切り出す。
 <!-- END claude-knowledge -->
+
+## ステージング環境（staging）
+
+本番と **別 Worker / 別 D1 / 別 URL に完全分離**した検証環境。詳細手順は `docs/DEPLOY.md` の「ステージング環境」節。
+
+- **ブランチ運用**: `develop` push → GitHub Actions（`.github/workflows/deploy-staging.yml`）が `wrangler deploy --env staging` を自動実行。本番は `main`。検証 → 本番昇格は `develop` → `main` マージ。
+- **Worker**: `netflix-deadline-api-staging`（https://netflix-deadline-api-staging.annndddddooooooo.workers.dev）／**D1**: `netflix-deadline-db-staging`。本番データは export/import で複製済み。
+- **設定は `apps/api/wrangler.jsonc` の `env.staging` ブロック**: wrangler の `vars` / `d1_databases` は**非継承キー**なので staging 側で再定義必須（書かないとバインドが空になる）。`assets` / `main` / `compatibility_date` は継承される。
+- **staging は cron 無効**（`env.staging.triggers.crons` は空）＋**通知シークレット未投入**（メール/LINE/Alexa OFF）。staging から実ユーザーへの誤通知・JustWatch 過剰アクセスを防ぐ安全装置。通知まで検証したいときだけ `wrangler secret put <NAME> --env staging` で個別投入。
+- **OAuth は本番と同じ Google クライアントを共用**（同じ `GOOGLE_CLIENT_ID`）。`GOOGLE_CLIENT_SECRET` は staging にも別途 `secret put --env staging` が必要で、未投入だと `/auth/google/start` が「OAuth が未設定」を返す。Google Console の Authorized redirect URIs に staging の `/auth/google/callback` 追加も必要。
+- **staging 用コマンド**: `npm run deploy:staging` / `npm run db:migrate:remote:staging`（本番同様 migration は push 前に適用）。
