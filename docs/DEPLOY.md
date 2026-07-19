@@ -190,11 +190,30 @@ VITE_LINE_BOT_BASIC_ID="@123abcde" npm run build -w @netflix-deadline/web
 
 ---
 
-## Alexa 通知（任意）
+## Alexa 通知（任意・現在は保留）
 
 Alexa の Proactive Events API で「通知センター」にダイジェストを届ける。
 Alexa スキル本体（VUI と Lambda）は **このリポジトリ外** で管理する前提。
 ここでは Worker 側（送信元）の手順だけ書く。
+
+> **ステータス（2026-07-19 時点）: 保留。**
+> Worker 側の送信コード・6桁コード連携・DB・設定 UI は完成し、スキル作成〜
+> アカウント連携（LinkCodeIntent）まで動作確認済み。ただし Proactive Events の
+> 送信は LWA トークン取得で `invalid_scope` になる。原因は **スキルのマニフェスト
+> （skill.json）に Proactive Events の宣言が無い**こと。有効化には以下が必要:
+>
+> - マニフェストに権限 `alexa::devices:all:notifications:write` を追加
+> - `events.publications` に `AMAZON.MessageAlert.Activated`、`endpoint`（Lambda ARN）、
+>   `subscriptions`（`SKILL_PROACTIVE_SUBSCRIPTION_CHANGED`）を追加
+> - Alexa アプリでスキルの通知を ON
+> - 原則としてスキルの認定（certification）申請（開発ステージの自己テストは条件次第）
+>
+> Alexa-hosted スキルのマニフェストは Console から編集できず ASK CLI が必要。
+> 再開時は「ASK CLI セットアップ → skill.json 編集 → 再デプロイ」から。
+> 参考: <https://developer.amazon.com/en-US/docs/alexa/smapi/proactive-events-api.html>
+>
+> 保留中は各ユーザーの `notify_alexa_enabled` を 0 にして週次 cron の無駄な失敗を
+> 止めている（メール・LINE の送信には影響しない）。
 
 ### 1. Alexa スキルを作る（概要）
 
