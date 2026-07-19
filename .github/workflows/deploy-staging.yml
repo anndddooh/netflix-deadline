@@ -1,0 +1,41 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+# 同時デプロイを防ぐ（前のデプロイが終わるまで次は待つ）
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: |
+          npm run typecheck -w @netflix-deadline/shared
+          npm run typecheck -w @netflix-deadline/api
+          npm run typecheck -w @netflix-deadline/web
+
+      # web の build + `wrangler deploy --env staging` をワンコマンドで実行。
+      # staging Worker (netflix-deadline-api-staging) / staging D1 に配信する。
+      # ※ D1 migration は本番同様 push より先に手動適用すること:
+      #   npm run db:migrate:remote:staging -w @netflix-deadline/api
+      - name: Deploy to Cloudflare Workers (staging)
+        run: npm run deploy:staging -w @netflix-deadline/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

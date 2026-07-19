@@ -289,6 +289,73 @@ npm run deploy -w @netflix-deadline/api
 
 ---
 
+## ステージング環境（staging）
+
+本番と **別 Worker / 別 D1 に完全分離**した検証環境。`develop` ブランチへの push で
+GitHub Actions（`.github/workflows/deploy-staging.yml`）が `wrangler deploy --env staging`
+を実行して自動デプロイする。本番は `main`、検証は `develop`。
+
+- **Worker**: `netflix-deadline-api-staging`
+  → <https://netflix-deadline-api-staging.annndddddooooooo.workers.dev>
+- **D1**: `netflix-deadline-db-staging`（id `4bd5d98b-50c5-400b-86a1-16c9b81a7b1d`）
+- **cron**: なし（`env.staging.triggers.crons` は空）。staging から実ユーザーへ誤通知せず、
+  JustWatch へも過剰アクセスしないための安全装置。
+- **通知シークレット**: 未投入 = メール/LINE/Alexa は OFF。検証で通知まで確認したくなったら
+  `wrangler secret put <NAME> --env staging` で個別投入する。
+- 設定は `apps/api/wrangler.jsonc` の `env.staging` ブロック。`vars` / `d1_databases` は
+  wrangler の非継承キーなので staging 側で再定義している（`assets` / `main` は継承）。
+
+### 構築時の手順（実施済み。再構築時の参考）
+
+```bash
+# 1. staging D1 を作成（出力の database_id を wrangler.jsonc の env.staging に反映）
+npx wrangler d1 create netflix-deadline-db-staging
+
+# 2. staging D1 に migration 適用
+npm run db:migrate:remote:staging -w @netflix-deadline/api
+
+# 3. 本番データを staging に複製（アプリ2テーブルのみ、d1_migrations は巻き込まない）
+npx wrangler d1 export netflix-deadline-db --remote --no-schema \
+  --table users --table watchlist_items --output /tmp/prod-data.sql
+npx wrangler d1 execute netflix-deadline-db-staging --env staging --remote --file /tmp/prod-data.sql
+
+# 4. 初回デプロイ（以後は develop への push で GitHub Actions が自動デプロイ）
+npm run deploy:staging -w @netflix-deadline/api
+```
+
+### 残りの手動手順（ログインを有効化する場合）
+
+staging Worker は稼働済みだが、Google ログインを使うには以下が必要:
+
+1. **セッション署名鍵**（本番と別鍵）:
+   ```bash
+   cd apps/api
+   openssl rand -base64 48   # 出力をコピー
+   npx wrangler secret put SESSION_SECRET --env staging   # 貼り付け
+   cd ../..
+   ```
+2. **Google OAuth リダイレクト URI を追加**:
+   <https://console.cloud.google.com/apis/credentials> → OAuth クライアント編集 →
+   Authorized redirect URIs に
+   `https://netflix-deadline-api-staging.annndddddooooooo.workers.dev/auth/google/callback`
+   を追加して Save。
+3. **`develop` ブランチを作成**して自動デプロイを有効化:
+   ```bash
+   git switch -c develop && git push -u origin develop
+   ```
+   以後 `develop` への push で staging に自動デプロイ、`develop` → `main` マージで本番昇格。
+
+### staging の migration・データ確認
+
+```bash
+# migration（push 前に本番同様、先に適用）
+npm run db:migrate:remote:staging -w @netflix-deadline/api
+
+# D1 の中身
+npx wrangler d1 execute netflix-deadline-db-staging --env staging --remote \
+  --command "SELECT COUNT(*) FROM watchlist_items;"
+```
+
 ## 補足
 
 ### secrets を一度に確認

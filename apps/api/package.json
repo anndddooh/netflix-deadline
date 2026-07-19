@@ -6,10 +6,12 @@
   "scripts": {
     "dev": "wrangler dev --test-scheduled --port 8787",
     "deploy": "npm run build -w @netflix-deadline/web && wrangler deploy",
+    "deploy:staging": "npm run build -w @netflix-deadline/web && wrangler deploy --env staging",
     "typecheck": "tsc -p tsconfig.json",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply netflix-deadline-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply netflix-deadline-db --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply netflix-deadline-db --remote",
+    "db:migrate:remote:staging": "wrangler d1 migrations apply netflix-deadline-db-staging --env staging --remote"
   },
   "dependencies": {
     "@netflix-deadline/shared": "*",

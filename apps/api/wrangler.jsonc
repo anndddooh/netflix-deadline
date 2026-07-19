@@ -55,5 +55,43 @@
   //  - 毎日 23:00 UTC (= 08:00 JST 翌日): 週次ダイジェストの送信判定
   "triggers": {
     "crons": ["0 * * * *", "0 23 * * *"]
+  },
+
+  // ── staging 環境 ───────────────────────────────────────────────
+  // develop ブランチへの push で GitHub Actions が `wrangler deploy --env staging`
+  // を実行し、本番と完全分離した staging Worker に配信する（deploy-staging.yml）。
+  //  - name    : 別 Worker (netflix-deadline-api-staging.<acct>.workers.dev)
+  //  - d1_databases : 別 D1 (netflix-deadline-db-staging)
+  // wrangler では vars / d1_databases は「非継承キー」なので staging 側で必ず再定義する
+  // （書かないと staging デプロイでバインドが空になる）。main / compatibility_date /
+  // assets はトップレベルから継承される。
+  //  - triggers.crons を空にして staging からの実ユーザーへの誤通知・JustWatch 過剰
+  //    アクセスを止める。
+  //  - 機密シークレット（RESEND / LINE / ALEXA / SESSION_SECRET / GOOGLE_CLIENT_SECRET）
+  //    は staging では未投入 = メール/LINE/Alexa 機能は OFF。必要になったら
+  //    `wrangler secret put <NAME> --env staging` で個別投入する。
+  "env": {
+    "staging": {
+      "name": "netflix-deadline-api-staging",
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "netflix-deadline-db-staging",
+          "database_id": "4bd5d98b-50c5-400b-86a1-16c9b81a7b1d",
+          "migrations_dir": "drizzle"
+        }
+      ],
+      "vars": {
+        "EMAIL_FROM": "MIOSAME (staging) <onboarding@resend.dev>",
+        "GOOGLE_CLIENT_ID": "209442782190-8h8celjv7np71i60vsutcbe58kh3aon7.apps.googleusercontent.com",
+        "OAUTH_REDIRECT_URI": "https://netflix-deadline-api-staging.annndddddooooooo.workers.dev/auth/google/callback",
+        "WEB_BASE": "https://netflix-deadline-api-staging.annndddddooooooo.workers.dev/",
+        "ALEXA_API_BASE": "https://api.amazonalexa.com/v1/proactiveEvents/stages/development"
+      },
+      // staging では cron を止める（本番ユーザーへの誤配信・JustWatch 過剰アクセス防止）。
+      "triggers": {
+        "crons": []
+      }
+    }
   }
 }
