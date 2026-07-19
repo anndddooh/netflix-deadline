@@ -80,9 +80,18 @@ async function getAccessToken(cfg: AlexaConfig): Promise<string> {
     body,
   });
   if (!res.ok) {
-    throw new Error(
-      `LWA token ${res.status}: ${(await res.text()).slice(0, 300)}`
-    );
+    // LWA のエラーは JSON。error / error_description だけ抜き出して読みやすくする。
+    const raw = await res.text();
+    let detail = raw.slice(0, 500);
+    try {
+      const j = JSON.parse(raw) as { error?: string; error_description?: string };
+      if (j.error || j.error_description) {
+        detail = `${j.error ?? ''}: ${j.error_description ?? ''}`;
+      }
+    } catch {
+      /* JSON でなければ生テキストのまま */
+    }
+    throw new Error(`LWA token ${res.status}: ${detail}`);
   }
   const json = (await res.json()) as { access_token: string; expires_in: number };
   cached = {
